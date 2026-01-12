@@ -48,4 +48,8 @@ export function skipPrevious(): void {
     return MediaSessionModule.skipPrevious();
 }
 
+export function seekTo(position: number): void {
+    return MediaSessionModule.seekTo(position);
+}
+
 export { MediaSessionModule };

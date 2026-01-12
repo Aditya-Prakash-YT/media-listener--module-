@@ -1,161 +1,235 @@
-# 🎵 Media Session Module
+# 🎵 Media Session Listener
 
-An Expo native module for Android that uses **MediaSessionManager** API to capture and control media playback from any audio source on your device.
+A powerful **Expo Native Module** for Android that leverages the `MediaSessionManager` API to listen for media playback events from *any* active media app (Spotify, YouTube, Apple Music, etc.) on the device.
 
-## Features
+> **Note**: This module currently supports **Android only**.
 
-- 🔔 **Real-time Media Events** – Captures metadata as soon as media playback changes
-- ▶️ **Playback State** – Tracks playing/paused/stopped/buffering states
-- ⏱️ **Position Tracking** – Current playback position and duration
-- 🎛️ **Transport Controls** – Play, pause, skip to next/previous track
-- 🖼️ **Album Artwork** – Extracts artwork as base64 data URI
-- 📱 **Source App Detection** – Identifies which app is playing media
+## ✨ Features
 
-## Version Comparison
+- **Real-time Event Listening**: Instantly detect when metadata or playback state changes.
+- **Universal Compatibility**: Works with any app that posts a standard MediaSession (Spotify, YouTube, SoundCloud, etc.).
+- **Playback Control**: Play, Pause, Skip Next, Skip Previous, and Seek.
+- **Rich Metadata**: Access Title, Artist, Album, Package Name, and Duration.
+- **Album Artwork**: Automatically extracts album art as a Base64 URI.
+- **State Management**: Robust state tracking (Playing, Paused, Buffering, Stopped).
+- **Synchronous State**: Get the current media state immediately with `getState()`.
 
-| Feature | v1.0 | v2.0 | v3.0 |
-|---------|------|------|------|
-| **API Used** | NotificationListenerService | MediaSessionManager | MediaSessionManager |
-| **Playback State** | ❌ | ✅ Playing/Paused/Stopped/Buffering | ✅ |
-| **Track Position** | ❌ | ✅ Current position + duration | ✅ |
-| **Playback Control** | ❌ | ✅ Play/Pause/Skip | ✅ |
-| **Album Artwork** | ❌ | ❌ | ✅ Base64 data URI |
-| **Get Current State** | ❌ | ❌ | ✅ `getState()` |
-| **Event Detection** | Notification parsing | MediaController callbacks | MediaController callbacks |
+## 📦 Installation
 
-### v3.0 Highlights
-
-1. **Album Artwork Extraction** – Retrieves artwork bitmap from MediaSession metadata and converts to base64 data URI
-2. **`getState()` API** – Synchronously get the current media state without waiting for an event
-3. **`artworkUri` Field** – New optional field in `MediaEvent` containing the artwork as a data URI
-
-## Tech Stack
-
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **React Native** | 0.81.5 | Cross-platform mobile framework |
-| **Expo** | ~54.0.30 | Development and build toolchain |
-| **Kotlin** | 2.1.20 | Native Android module implementation |
-| **TypeScript** | ~5.9.2 | Type-safe JavaScript |
-
-## Architecture
-
-```
-modules/media-session/
-├── index.ts                          # TypeScript API wrapper
-├── expo-module.config.json           # Expo native module config
-└── android/src/main/kotlin/
-    └── expo/modules/mediasession/
-        ├── MediaSessionModule.kt     # Expo module bridge
-        ├── MediaSessionService.kt    # NotificationListener + MediaSessionManager
-        └── MediaEventManager.kt      # Event emission singleton
-```
-
-
-## Installation
+### 1. Install the package
 
 ```bash
-# Clone the repository
-git clone https://github.com/VICHiNG16/media-listener-app.git
+# Clone this repository or copy the module folder
+git clone https://github.com/your-username/media-listener-app.git
 cd media-listener-app
 
 # Install dependencies
 npm install
+```
 
-# Generate native project
+### 2. Configure Native Project
+
+Since this is a native module, you must prebuild your Expo project to generate the android folder.
+
+```bash
 npx expo prebuild --platform android
+```
 
-# Run on Android device
+### 3. Run the App
+
+```bash
 npx expo run:android
 ```
 
-## Building Standalone APK
+## 🔒 Permissions
 
-```bash
-cd android
-./gradlew assembleRelease
-```
+This module relies on the **Notification Listener Service**.
 
-The APK will be at: `android/app/build/outputs/apk/release/app-release.apk`
+1.  **Request Permission**: When you first call `MediaSession.requestPermission()`, the user will be taken to the Android **Notification Access** settings screen.
+2.  **Grant Access**: The user must manually toggle the switch for your app to allow it to read media notifications.
+3.  **Automatic Detection**: The `hasPermission()` method allows you to check if the user has granted access.
 
-## Permissions
+## 🚀 Usage
 
-The app requires **Notification Listener** permission to access MediaSessionManager. On first launch:
+### Basic Usage
 
-1. Tap "Grant Permission"
-2. Find and enable the app in Notification Access settings
-3. Return to the app
-
-> **Note:** MediaSessionManager.getActiveSessions() requires NotificationListenerService permission for third-party apps. The MEDIA_CONTENT_CONTROL permission is only available to system apps.
-
-## API Usage
+Subscribe to media events to log the currently playing song.
 
 ```typescript
+import { useEffect } from 'react';
 import * as MediaSession from './modules/media-session';
 
-// Check/request permission
-const hasPermission = MediaSession.hasPermission();
-MediaSession.requestPermission();
+export default function MediaTracker() {
+  useEffect(() => {
+    // 1. Check permissions
+    if (!MediaSession.hasPermission()) {
+      MediaSession.requestPermission();
+      return;
+    }
 
-// Get current state (v3.0+)
-const currentState = MediaSession.getState();
-if (currentState) {
-  console.log('Currently playing:', currentState.title);
-}
+    // 2. Subscribe to events
+    const subscription = MediaSession.addMediaListener((event) => {
+      console.log('Now Playing:', event.title);
+      console.log('Artist:', event.artist);
+      console.log('State:', event.state); // 'playing', 'paused', etc.
+    });
 
-// Listen for media changes
-const subscription = MediaSession.addMediaListener((event) => {
-  console.log('Track:', event.title, 'by', event.artist);
-  console.log('State:', event.state);
-  console.log('Position:', event.position, '/', event.duration);
-  
-  // Album artwork (v3.0+)
-  if (event.artworkUri) {
-    console.log('Artwork available as data URI');
-  }
-});
+    return () => subscription.remove();
+  }, []);
 
-// Transport controls
-MediaSession.play();
-MediaSession.pause();
-MediaSession.skipNext();
-MediaSession.skipPrevious();
-
-// Clean up
-subscription.remove();
-```
-
-## Media Event Object
-
-```typescript
-{
-  title: string;       // Track title
-  artist: string;      // Artist name
-  album: string;       // Album name
-  package: string;     // Source app package name
-  state: 'playing' | 'paused' | 'stopped' | 'buffering' | 'unknown';
-  position: number;    // Current position in ms
-  duration: number;    // Track duration in ms
-  timestamp: number;   // Event timestamp
-  artworkUri?: string; // Album artwork as base64 data URI (v3.0+)
+  return null;
 }
 ```
 
-## Why MediaSessionManager?
+### Advanced: Full Media Player Component
 
-Android's MediaSessionManager provides a more robust way to interact with media sessions:
+Here is a complete example of a robust media player UI that tracks position, updates a progress bar, and controls playback.
 
-- **Direct access** to playback state instead of parsing notification text
-- **Transport controls** to control playback
-- **Callback-based updates** for real-time state changes
-- **Position tracking** for progress display
+```tsx
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, Image, TouchableOpacity, AppState } from 'react-native';
+import * as MediaSession from './modules/media-session';
 
-However, it still requires NotificationListenerService permission for third-party apps to access sessions from other applications.
+export default function MusicPlayer() {
+  const [media, setMedia] = useState<MediaSession.MediaEvent | null>(null);
+  const [displayPosition, setDisplayPosition] = useState(0);
+  const positionRef = useRef(0);
+
+  useEffect(() => {
+    // Initial check
+    const current = MediaSession.getState();
+    if (current) setMedia(current);
+
+    // Listen for updates
+    const sub = MediaSession.addMediaListener((event) => {
+      setMedia(event);
+      positionRef.current = event.position;
+      setDisplayPosition(event.position);
+    });
+
+    // Local timer to smooth out the progress bar
+    const interval = setInterval(() => {
+      if (media?.state === 'playing') {
+        positionRef.current += 1000;
+        setDisplayPosition(positionRef.current);
+      }
+    }, 1000);
+
+    return () => {
+      sub.remove();
+      clearInterval(interval);
+    };
+  }, [media?.state]);
+
+  const handlePlayPause = () => {
+    if (media?.state === 'playing') {
+      MediaSession.pause();
+    } else {
+      MediaSession.play();
+    }
+  };
+
+  if (!media) return <Text>No Media Playing</Text>;
+
+  return (
+    <View style={{ padding: 20, alignItems: 'center' }}>
+      {/* Artwork */}
+      {media.artworkUri && (
+        <Image 
+          source={{ uri: media.artworkUri }} 
+          style={{ width: 200, height: 200, borderRadius: 10 }} 
+        />
+      )}
+      
+      {/* Metadata */}
+      <Text style={{ fontSize: 18, fontWeight: 'bold', marginTop: 10 }}>
+        {media.title}
+      </Text>
+      <Text style={{ color: '#888' }}>{media.artist}</Text>
+
+      {/* Progress Bar */}
+      <View style={{ width: '100%', height: 5, backgroundColor: '#333', marginVertical: 20 }}>
+        <View style={{ 
+          width: `${(displayPosition / media.duration) * 100}%`, 
+          height: '100%', 
+          backgroundColor: 'white' 
+        }} />
+      </View>
+
+      {/* Controls */}
+      <View style={{ flexDirection: 'row', gap: 20 }}>
+        <TouchableOpacity onPress={MediaSession.skipPrevious}>
+          <Text>⏮ Prev</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity onPress={handlePlayPause}>
+          <Text>{media.state === 'playing' ? '⏸ Pause' : '▶ Play'}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={MediaSession.skipNext}>
+          <Text>Next ⏭</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+```
+
+## 📚 API Reference
+
+### `MediaEvent` Object
+
+The event object returned by listeners and `getState()`.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `title` | `string` | The title of the track. |
+| `artist` | `string` | The name of the artist. |
+| `album` | `string` | The album name. |
+| `package` | `string` | The package name of the app playing media (e.g., `com.spotify.music`). |
+| `state` | `string` | One of: `'playing'`, `'paused'`, `'stopped'`, `'buffering'`, `'unknown'`. |
+| `position` | `number` | Current playback position in milliseconds. |
+| `duration` | `number` | Total track duration in milliseconds. |
+| `artworkUri`| `string?`| (Optional) Base64 encoded data URI of the album art. |
+| `timestamp` | `number` | The timestamp when the event was generated. |
+
+### Methods
+
+#### `requestPermission(): void`
+Opens the Android Notification Listener settings page.
+
+#### `hasPermission(): boolean`
+Returns `true` if the notification listener permission has been granted.
+
+#### `addMediaListener(callback): Subscription`
+Subscribes to real-time media events.
+- **callback**: `(event: MediaEvent) => void`
+- **Returns**: A simplified subscription object with a `.remove()` method.
+
+#### `getState(): MediaEvent | null`
+Synchronously retrieves the last known media state without waiting for a new event. Useful for populating the UI on app launch.
+
+#### Control Methods
+- `play(): void` - Send play command.
+- `pause(): void` - Send pause command.
+- `skipNext(): void` - Skip to the next track.
+- `skipPrevious(): void` - Skip to the previous track.
+- `seekTo(position: number): void` - Seek to a specific position in ms.
+
+## 🛠 Troubleshooting
+
+### Artwork is missing or not updating
+- **Cause**: Some apps do not publish the bitmap in the standard MediaMetadata fields, or the image is too large and was dropped by the system binder.
+- **Solution**: The module attempts to cache the image to disk to avoid binder limits. Ensure you are using the latest version of the module.
+
+### `hasPermission` returns false even after granting
+- **Cause**: Android sometimes delays the status update.
+- **Solution**: Use `AppState` to check permission again when the user returns to the app from settings.
+
+### Controls (Play/Pause) not working
+- **Cause**: The active media session might not support transport controls, or the app has been killed by the system.
+- **Solution**: This is a limitation of the source app. Controls only work if the source app has an active `MediaSession`.
 
 ## License
 
-MIT
-
-## Author
-
-Built with ❤️ using React Native, Expo, and Kotlin
+MIT License.

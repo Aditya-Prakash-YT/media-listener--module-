@@ -41,6 +41,10 @@ class MediaSessionModule : Module() {
             MediaSessionService.activeController?.transportControls?.skipToPrevious()
         }
 
+        Function("seekTo") { position: Long ->
+            MediaSessionService.activeController?.transportControls?.seekTo(position)
+        }
+
         Function("getState") {
             val controller = MediaSessionService.activeController
             if (controller == null) return@Function null

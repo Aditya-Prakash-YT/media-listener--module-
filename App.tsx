@@ -22,6 +22,22 @@ export default function App() {
   const [status, setStatus] = useState('Initializing...');
   const positionRef = useRef(0);
   const [displayPosition, setDisplayPosition] = useState(0);
+  const [trackWidth, setTrackWidth] = useState(0);
+
+  const handleSeek = (evt: any) => {
+    if (!mediaData?.duration || !trackWidth) return;
+
+    const locationX = evt.nativeEvent.locationX;
+    const percentage = Math.max(0, Math.min(1, locationX / trackWidth));
+    const newPosition = Math.floor(percentage * mediaData.duration);
+
+    // Update local state immediately for responsiveness
+    setDisplayPosition(newPosition);
+    positionRef.current = newPosition;
+
+    // Call native seek
+    MediaSession.seekTo(newPosition);
+  };
 
   const checkPermission = () => {
     try {
@@ -119,9 +135,18 @@ export default function App() {
 
             {/* Progress */}
             <View style={styles.progressContainer}>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressThumb, { width: `${progressPercent}%` }]} />
-              </View>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={handleSeek}
+                style={styles.progressTouchArea}
+              >
+                <View
+                  style={styles.progressTrack}
+                  onLayout={(e: any) => setTrackWidth(e.nativeEvent.layout.width)}
+                >
+                  <View style={[styles.progressThumb, { width: `${progressPercent}%` }]} />
+                </View>
+              </TouchableOpacity>
               <View style={styles.timeLabels}>
                 <Text style={styles.timeValue}>{formatTime(displayPosition)}</Text>
                 <Text style={styles.timeValue}>{formatTime(mediaData.duration)}</Text>
@@ -283,14 +308,18 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 30,
   },
+  progressTouchArea: {
+    paddingVertical: 10,
+  },
   progressTrack: {
-    height: 1,
+    height: 4, // Increased height slightly for better visibility
     backgroundColor: COLORS.border,
-    marginBottom: 10,
+    borderRadius: 2,
   },
   progressThumb: {
-    height: 1,
+    height: '100%',
     backgroundColor: COLORS.primary,
+    borderRadius: 2,
   },
   timeLabels: {
     flexDirection: 'row',
