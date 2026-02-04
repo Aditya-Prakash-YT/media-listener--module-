@@ -8,7 +8,7 @@ A powerful **Expo Native Module** for Android that leverages the `MediaSessionMa
 - **Universal Compatibility**: Works with any app that posts a standard MediaSession (Spotify, YouTube, SoundCloud, etc.).
 - **Playback Control**: Play, Pause, Skip Next, Skip Previous, and Seek.
 - **Rich Metadata**: Access Title, Artist, Album, Package Name, and Duration.
-- **Album Artwork**: Automatically extracts album art as a Base64 URI.
+- **Live Album Artwork**: Automatically extracts art as a file URI with cache-busting timestamps.
 - **State Management**: Robust state tracking (Playing, Paused, Buffering, Stopped).
 - **Synchronous State**: Get the current media state immediately with `getState()`.
 
@@ -49,13 +49,15 @@ npx expo run:android
 ### Basic Example
 
 ```typescript
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { View, Button, Text } from 'react-native';
 import * as MediaSession from 'media-session';
 
 export default function MediaTracker() {
+  const [media, setMedia] = useState<MediaSession.MediaEvent | null>(null);
+
   useEffect(() => {
     // 1. Request/Check permissions
-    // This takes the user to Notification Access settings
     if (!MediaSession.hasPermission()) {
       MediaSession.requestPermission();
       return;
@@ -63,15 +65,34 @@ export default function MediaTracker() {
 
     // 2. Subscribe to events
     const subscription = MediaSession.addMediaListener((event) => {
+      setMedia(event);
       console.log('Now Playing:', event.title);
-      console.log('Artist:', event.artist);
-      console.log('State:', event.state); // 'playing', 'paused', etc.
     });
 
     return () => subscription.remove();
   }, []);
 
-  return null;
+  const handleSeek = () => {
+    if (media) {
+      // Seek to 30 seconds
+      MediaSession.seekTo(30000); 
+    }
+  };
+
+  if (!media) return <Text>No media playing</Text>;
+
+  return (
+    <View>
+      <Text>{media.title} by {media.artist}</Text>
+      <View style={{ flexDirection: 'row' }}>
+        <Button title="Prev" onPress={() => MediaSession.skipPrevious()} />
+        <Button title={media.state === 'playing' ? 'Pause' : 'Play'} 
+                onPress={() => media.state === 'playing' ? MediaSession.pause() : MediaSession.play()} />
+        <Button title="Next" onPress={() => MediaSession.skipNext()} />
+      </View>
+      <Button title="Seek to 0:30" onPress={handleSeek} />
+    </View>
+  );
 }
 ```
 
@@ -128,7 +149,7 @@ Synchronously retrieves the last known media state.
 
 ## 🛠 Troubleshooting
 
-- **Artwork missing**: Some apps (like YouTube) may not always provide the artwork in the media metadata or it might be dropped if too large.
+- **Artwork missing/stale**: Some apps don't provide art. The module uses `?ts=<timestamp>` on URIs to prevent stale caching in the UI. 
 - **Permission delay**: Android sometimes delays updating permission status. Check again when the app returns from settings using `AppState`.
 
 ## License

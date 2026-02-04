@@ -96,11 +96,11 @@ class MediaSessionModule : Module() {
                          val stream = java.io.FileOutputStream(file)
                          bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
                          stream.close()
-                         artworkUri = "file://${file.absolutePath}"
+                         artworkUri = "file://${file.absolutePath}?ts=${System.currentTimeMillis()}"
                      } else {
                          val artUriStr = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART_URI)
                             ?: metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ART_URI)
-                         if (artUriStr != null) artworkUri = artUriStr
+                         if (artUriStr != null) artworkUri = "$artUriStr?ts=${System.currentTimeMillis()}"
                      }
                 } catch(e: Exception) {}
                 

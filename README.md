@@ -4,15 +4,13 @@ A powerful **Expo Native Module** for Android that leverages the `MediaSessionMa
 
 > **Note**: This module currently supports **Android only**.
 
-## ✨ Features
-
-- **Real-time Event Listening**: Instantly detect when metadata or playback state changes.
-- **Universal Compatibility**: Works with any app that posts a standard MediaSession (Spotify, YouTube, SoundCloud, etc.).
-- **Playback Control**: Play, Pause, Skip Next, Skip Previous, and Seek.
+- **Real-time Event Listening**: Instantly detect metadata and playback state changes.
+- **Universal Compatibility**: Works with any media app (Spotify, YouTube, SoundCloud, etc.).
+- **Interactive Playback Control**: Play, Pause, Skip Next, Skip Previous, and Seek.
+- **Precise Seeking**: Draggable seek bar and manual time entry (MM:SS) for custom timing.
 - **Rich Metadata**: Access Title, Artist, Album, Package Name, and Duration.
-- **Album Artwork**: Automatically extracts album art as a Base64 URI.
-- **State Management**: Robust state tracking (Playing, Paused, Buffering, Stopped).
-- **Synchronous State**: Get the current media state immediately with `getState()`.
+- **Improved Album Artwork**: Automatic extraction with cache-busting logic for real-time updates.
+- **Robust State Tracking**: Synchronous and asynchronous state management.
 
 ## 📦 Installation
 
@@ -219,8 +217,8 @@ Synchronously retrieves the last known media state without waiting for a new eve
 ## 🛠 Troubleshooting
 
 ### Artwork is missing or not updating
-- **Cause**: Some apps do not publish the bitmap in the standard MediaMetadata fields, or the image is too large and was dropped by the system binder.
-- **Solution**: The module attempts to cache the image to disk to avoid binder limits. Ensure you are using the latest version of the module.
+- **Cause**: Some apps do not publish the bitmap standard fields. Also, static URIs can cause UI components to reuse stale cached images.
+- **Solution**: The module automatically appends timestamps to artwork URIs (`?ts=...`) to force cache busting and ensure real-time updates when song art changes.
 
 ### `hasPermission` returns false even after granting
 - **Cause**: Android sometimes delays the status update.

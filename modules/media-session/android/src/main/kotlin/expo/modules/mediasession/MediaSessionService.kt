@@ -129,13 +129,13 @@ class MediaSessionService : NotificationListenerService() {
                 val stream = java.io.FileOutputStream(file)
                 bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
                 stream.close()
-                artworkUri = "file://${file.absolutePath}"
+                artworkUri = "file://${file.absolutePath}?ts=${System.currentTimeMillis()}"
             } else {
                  // Try string uri if bitmap is missing (less common for local players but possible)
                  val artUriStr = metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI)
                     ?: metadata?.getString(MediaMetadata.METADATA_KEY_ART_URI)
                  if (artUriStr != null) {
-                     artworkUri = artUriStr
+                     artworkUri = "$artUriStr?ts=${System.currentTimeMillis()}"
                  }
             }
         } catch (e: Exception) {
