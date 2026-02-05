@@ -1,157 +1,204 @@
 # 🎵 Media Session (Expo Native Module)
 
+**Version 3.0 Patch 1**
+
 A powerful **Expo Native Module** for Android that leverages the `MediaSessionManager` API to listen for media playback events from *any* active media app (Spotify, YouTube, Apple Music, etc.) on the device.
+
+> **Platform**: Android only (API 24+)
+
+---
 
 ## ✨ Features
 
-- **Real-time Event Listening**: Instantly detect when metadata or playback state changes.
-- **Universal Compatibility**: Works with any app that posts a standard MediaSession (Spotify, YouTube, SoundCloud, etc.).
-- **Playback Control**: Play, Pause, Skip Next, Skip Previous, and Seek.
-- **Rich Metadata**: Access Title, Artist, Album, Package Name, and Duration.
-- **Live Album Artwork**: Automatically extracts art as a file URI with cache-busting timestamps.
-- **State Management**: Robust state tracking (Playing, Paused, Buffering, Stopped).
-- **Synchronous State**: Get the current media state immediately with `getState()`.
+- **Real-time Event Listening** — Instantly detect metadata and playback state changes.
+- **Universal Compatibility** — Works with Spotify, YouTube, SoundCloud, Apple Music, and more.
+- **Playback Control** — Play, Pause, Skip Next, Skip Previous, and Seek.
+- **Rich Metadata** — Title, Artist, Album, Package Name, Duration, Position.
+- **Live Album Artwork** — Smart caching to prevent UI flashing.
+- **Robust State Management** — Synchronous (`getState()`) and asynchronous (listeners).
+
+---
 
 ## 📦 Installation
 
-This module is distributed as a local NPM tarball. To install it in your project:
+### Option 1: Local Module (Development)
 
-### 1. Generate/Copy the Tarball
-
-If you've made changes, generate a new timestamped tarball inside the module directory:
-```bash
-# Inside modules/media-session
-npm run pack-time
-```
-
-Copy the generated `.tgz` file (e.g., `media-session-20240101-120000-1.0.0.tgz`) to your consumer project.
-
-### 2. Install via NPM/Yarn
-
-Run the following command in your project root, pointing to the path of the tarball:
+If using as a local module in `modules/media-session`:
 
 ```bash
-npm install ./path/to/media-session-*.tgz
-# or
-yarn add ./path/to/media-session-*.tgz
-```
-
-### 3. Rebuild the Native App
-
-Since this is a native module, you must rebuild your development client:
-
-```bash
+# Expo autolinking handles it automatically
+npx expo prebuild --platform android
 npx expo run:android
 ```
 
-## 🚀 Usage
+### Option 2: NPM Tarball
 
-### Basic Example
+```bash
+# Generate timestamped tarball
+cd modules/media-session
+npm run pack-time
+
+# Install in your project
+npm install ./path/to/media-session-*.tgz
+npx expo run:android
+```
+
+---
+
+## 🔒 Permissions
+
+This module requires **Notification Listener** permission.
+
+```typescript
+import * as MediaSession from 'media-session';
+
+// Check permission
+if (!MediaSession.hasPermission()) {
+  MediaSession.requestPermission(); // Opens Android settings
+}
+```
+
+---
+
+## 🚀 Quick Start
+
+```typescript
+import * as MediaSession from 'media-session';
+
+// Subscribe to media events
+const subscription = MediaSession.addMediaListener((event) => {
+  console.log(`${event.title} by ${event.artist}`);
+  console.log(`State: ${event.state}`);
+  console.log(`Position: ${event.position}/${event.duration} ms`);
+});
+
+// Control playback
+MediaSession.play();
+MediaSession.pause();
+MediaSession.skipNext();
+MediaSession.skipPrevious();
+MediaSession.seekTo(30000); // 30 seconds
+
+// Cleanup
+subscription.remove();
+```
+
+---
+
+## 🎯 Usage Examples
+
+### Basic Component
 
 ```typescript
 import { useEffect, useState } from 'react';
-import { View, Button, Text } from 'react-native';
+import { Text, View, Image } from 'react-native';
 import * as MediaSession from 'media-session';
 
-export default function MediaTracker() {
+export default function NowPlaying() {
   const [media, setMedia] = useState<MediaSession.MediaEvent | null>(null);
 
   useEffect(() => {
-    // 1. Request/Check permissions
     if (!MediaSession.hasPermission()) {
       MediaSession.requestPermission();
       return;
     }
 
-    // 2. Subscribe to events
-    const subscription = MediaSession.addMediaListener((event) => {
-      setMedia(event);
-      console.log('Now Playing:', event.title);
-    });
-
-    return () => subscription.remove();
+    const sub = MediaSession.addMediaListener(setMedia);
+    return () => sub.remove();
   }, []);
 
-  const handleSeek = () => {
-    if (media) {
-      // Seek to 30 seconds
-      MediaSession.seekTo(30000); 
-    }
-  };
-
-  if (!media) return <Text>No media playing</Text>;
+  if (!media) return <Text>No active media</Text>;
 
   return (
     <View>
-      <Text>{media.title} by {media.artist}</Text>
-      <View style={{ flexDirection: 'row' }}>
-        <Button title="Prev" onPress={() => MediaSession.skipPrevious()} />
-        <Button title={media.state === 'playing' ? 'Pause' : 'Play'} 
-                onPress={() => media.state === 'playing' ? MediaSession.pause() : MediaSession.play()} />
-        <Button title="Next" onPress={() => MediaSession.skipNext()} />
-      </View>
-      <Button title="Seek to 0:30" onPress={handleSeek} />
+      {media.artworkUri && (
+        <Image source={{ uri: media.artworkUri }} style={{ width: 200, height: 200 }} />
+      )}
+      <Text>{media.title}</Text>
+      <Text>{media.artist}</Text>
     </View>
   );
 }
 ```
 
-### Synchronous State
-
-Retrieve the last known media state immediately (e.g., on app launch):
+### Seeking to Custom Time
 
 ```typescript
+// Seek to 2 minutes
+MediaSession.seekTo(120000);
+
+// Seek forward 10 seconds
+const current = media.position;
+MediaSession.seekTo(current + 10000);
+
+// Seek backward 10 seconds
+MediaSession.seekTo(Math.max(0, current - 10000));
+```
+
+### Synchronous State
+
+```typescript
+// Get current state immediately (useful on mount)
 const current = MediaSession.getState();
 if (current) {
-  console.log('Last Title:', current.title);
+  console.log('Currently playing:', current.title);
 }
 ```
+
+---
 
 ## 📚 API Reference
 
 ### `MediaEvent` Object
 
-The event object returned by listeners and `getState()`.
-
 | Property | Type | Description |
 |----------|------|-------------|
-| `title` | `string` | The title of the track. |
-| `artist` | `string` | The name of the artist. |
-| `album` | `string` | The album name. |
-| `package` | `string` | The package name of the app playing media. |
-| `state` | `string` | `'playing'`, `'paused'`, `'stopped'`, `'buffering'`, or `'unknown'`. |
-| `position` | `number` | Current playback position in milliseconds. |
-| `duration` | `number` | Total track duration in milliseconds. |
-| `artworkUri`| `string?`| (Optional) Base64 encoded data URI of the album art. |
-| `timestamp` | `number` | The timestamp when the event was generated. |
+| `title` | `string` | Track title |
+| `artist` | `string` | Artist name |
+| `album` | `string` | Album name |
+| `package` | `string` | Source app package (e.g., `com.spotify.music`) |
+| `state` | `'playing' \| 'paused' \| 'stopped' \| 'buffering' \| 'unknown'` | Playback state |
+| `position` | `number` | Position in milliseconds |
+| `duration` | `number` | Duration in milliseconds |
+| `artworkUri` | `string?` | File URI with cache-busting timestamp |
+| `timestamp` | `number` | Event timestamp |
 
 ### Methods
 
-#### `requestPermission(): void`
-Opens the Android Notification Listener settings page.
+| Method | Description |
+|--------|-------------|
+| `requestPermission()` | Opens Notification Access settings |
+| `hasPermission()` | Returns `true` if permission granted |
+| `addMediaListener(callback)` | Subscribe to events, returns `{ remove() }` |
+| `getState()` | Returns current `MediaEvent` or `null` |
+| `play()` | Send play command |
+| `pause()` | Send pause command |
+| `skipNext()` | Skip to next track |
+| `skipPrevious()` | Skip to previous track |
+| `seekTo(position)` | Seek to position in milliseconds |
 
-#### `hasPermission(): boolean`
-Returns `true` if the notification listener permission has been granted.
-
-#### `addMediaListener(callback): Subscription`
-Subscribes to real-time media events.
-- **Returns**: A subscription object with a `.remove()` method.
-
-#### `getState(): MediaEvent | null`
-Synchronously retrieves the last known media state.
-
-#### Control Methods
-- `play(): void`
-- `pause(): void`
-- `skipNext(): void`
-- `skipPrevious(): void`
-- `seekTo(position: number): void`
+---
 
 ## 🛠 Troubleshooting
 
-- **Artwork missing/stale**: Some apps don't provide art. The module uses `?ts=<timestamp>` on URIs to prevent stale caching in the UI. 
-- **Permission delay**: Android sometimes delays updating permission status. Check again when the app returns from settings using `AppState`.
+| Issue | Solution |
+|-------|----------|
+| Artwork missing | Some apps don't provide artwork; `artworkUri` will be `null` |
+| Artwork flashing | Fixed in v3.0.1 with smart caching |
+| Permission not detected | Re-check with `AppState.addEventListener('change')` |
+| Controls not working | Source app may not support transport controls |
 
-## License
+---
+
+## 📝 Changelog
+
+**v3.0.1** — Smart artwork caching, seek bar thumb, Feather icons  
+**v3.0.0** — `seekTo()`, manual time entry, draggable seek bar  
+**v2.0.0** — Artwork extraction, `getState()`  
+**v1.0.0** — Initial release
+
+---
+
+## 📄 License
 
 MIT

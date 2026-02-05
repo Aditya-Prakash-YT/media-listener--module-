@@ -22,6 +22,9 @@ class MediaSessionService : NotificationListenerService() {
         var activeController: MediaController? = null
             private set
     }
+    
+    private data class ArtCache(val signature: String, val timestamp: Long)
+    private val artworkCache = mutableMapOf<String, ArtCache>()
 
     private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
         mainHandler.post {
@@ -117,25 +120,55 @@ class MediaSessionService : NotificationListenerService() {
 
         var artworkUri: String? = null
         try {
+            val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
+            val album = metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: ""
+            val signature = "$title|$album"
+
              // Try to get the art bitmap
             val bitmap = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
                 ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
 
             if (bitmap != null) {
-                // Save to cache
-                // We use the package name to avoid collisions if multiple apps are playing (though rare for active session)
-                // Use a consistent name per package to overwrite old art and save space
+                // Check cache
+                val cache = artworkCache[controller.packageName]
+                val ts: Long
+                
+                 if (cache != null && cache.signature == signature) {
+                    // Reuse timestamp, do not write file
+                    ts = cache.timestamp
+                 } else {
+                    // New track or first time, write file and update cache
+                    ts = System.currentTimeMillis()
+                    val file = java.io.File(cacheDir, "album_art_${controller.packageName}.png")
+                    val stream = java.io.FileOutputStream(file)
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+                    stream.close()
+                    artworkCache[controller.packageName] = ArtCache(signature, ts)
+                 }
+
                 val file = java.io.File(cacheDir, "album_art_${controller.packageName}.png")
-                val stream = java.io.FileOutputStream(file)
-                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
-                stream.close()
-                artworkUri = "file://${file.absolutePath}?ts=${System.currentTimeMillis()}"
+                artworkUri = "file://${file.absolutePath}?ts=$ts"
             } else {
                  // Try string uri if bitmap is missing (less common for local players but possible)
                  val artUriStr = metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI)
                     ?: metadata?.getString(MediaMetadata.METADATA_KEY_ART_URI)
                  if (artUriStr != null) {
-                     artworkUri = "$artUriStr?ts=${System.currentTimeMillis()}"
+                     // For URI strings, we can also try to be smart, but they usually don't flash as much unless we append new ts every time.
+                     // The previous fix appended TS every time. Let's apply similar logic or just act as pass-through?
+                     // If the URI string itself changes, the image view updates. 
+                     // If we append a constantly changing TS to a static URI, it flashes.
+                     // So we should map the external URI to a cached version too?
+                     // Simplest: Use signature logic for this too.
+                     
+                     val cache = artworkCache[controller.packageName]
+                     val ts: Long
+                     if (cache != null && cache.signature == signature) {
+                        ts = cache.timestamp
+                     } else {
+                        ts = System.currentTimeMillis()
+                        artworkCache[controller.packageName] = ArtCache(signature, ts)
+                     }
+                     artworkUri = "$artUriStr?ts=$ts"
                  }
             }
         } catch (e: Exception) {

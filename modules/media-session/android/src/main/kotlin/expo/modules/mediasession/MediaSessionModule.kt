@@ -8,6 +8,18 @@ import android.os.Bundle
 import android.media.session.PlaybackState
 
 class MediaSessionModule : Module() {
+    // Shared cache for synchronous calls? 
+    // Ideally we'd share with Service, but they are different instances/contexts.
+    // For synchronous getState, we just want to avoid creating a NEW file if we don't have to,
+    // BUT we don't have persistent state between calls easily here unless we use a companion object or similar.
+    // Actually, simple static map in companion object of Service is accessible!
+    // But let's just use a local static map here for the Module instance.
+    
+    private data class ArtCache(val signature: String, val timestamp: Long)
+    companion object {
+        private val artworkCache = mutableMapOf<String, ArtCache>()
+    }
+
     override fun definition() = ModuleDefinition {
         Name("MediaSession")
 
@@ -84,23 +96,48 @@ class MediaSessionModule : Module() {
                 // Given the user asked for "event.mediaGraphic", the event is the primary mechanism.
                 // But consistency is good. Let's trying to support it if easy.
                 
-                // Retrying extraction:
+                // Retrying extraction with cache logic:
                 var artworkUri: String? = null
                 try {
+                     val title = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: ""
+                     val album = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM) ?: ""
+                     val signature = "$title|$album"
+                     
                      val bitmap = metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART)
                         ?: metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART)
+                     
                      if (bitmap != null) {
+                         val cache = artworkCache[controller.packageName]
+                         val ts: Long
+                         
+                         if (cache != null && cache.signature == signature) {
+                             ts = cache.timestamp
+                         } else {
+                             ts = System.currentTimeMillis()
+                             val file = java.io.File(context.cacheDir, "album_art_${controller.packageName}.png")
+                             val stream = java.io.FileOutputStream(file)
+                             bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+                             stream.close()
+                             artworkCache[controller.packageName] = ArtCache(signature, ts)
+                         }
+                         
                          val file = java.io.File(context.cacheDir, "album_art_${controller.packageName}.png")
-                         // Writing to disk on main thread/JS thread might be bad if image is huge, 
-                         // but standard metadata icons are usually small.
-                         val stream = java.io.FileOutputStream(file)
-                         bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
-                         stream.close()
-                         artworkUri = "file://${file.absolutePath}?ts=${System.currentTimeMillis()}"
+                         artworkUri = "file://${file.absolutePath}?ts=$ts"
                      } else {
                          val artUriStr = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART_URI)
                             ?: metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ART_URI)
-                         if (artUriStr != null) artworkUri = "$artUriStr?ts=${System.currentTimeMillis()}"
+                         
+                         if (artUriStr != null) {
+                             val cache = artworkCache[controller.packageName]
+                             val ts: Long
+                             if (cache != null && cache.signature == signature) {
+                                ts = cache.timestamp
+                             } else {
+                                ts = System.currentTimeMillis()
+                                artworkCache[controller.packageName] = ArtCache(signature, ts)
+                             }
+                             artworkUri = "$artUriStr?ts=$ts"
+                         }
                      }
                 } catch(e: Exception) {}
                 

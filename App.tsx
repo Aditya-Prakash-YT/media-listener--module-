@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, AppState, Image, StatusBar, Dimensions, PanResponder, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import * as MediaSession from './modules/media-session';
 
 const { width } = Dimensions.get('window');
@@ -23,24 +24,32 @@ export default function App() {
   const positionRef = useRef(0);
   const [displayPosition, setDisplayPosition] = useState(0);
   const [trackWidth, setTrackWidth] = useState(0);
-  
+
   // Seeking State
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekToTime, setSeekToTime] = useState('');
   const [showSeekModal, setShowSeekModal] = useState(false);
+  const trackX = useRef(0); // Absolute X position of the track
 
   // PanResponder for drag seeking
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
+      onPanResponderGrant: (evt) => {
         setIsSeeking(true);
+        // Calculate track's absolute X position: Touch PageX - Touch Relative Location
+        // This makes it robust to padding/margins without hardcoding '30'
+        trackX.current = evt.nativeEvent.pageX - evt.nativeEvent.locationX;
       },
       onPanResponderMove: (evt, gestureState) => {
         if (!trackWidth || !mediaData?.duration) return;
-        const locationX = Math.max(0, Math.min(gestureState.moveX - 30, trackWidth)); // 30 is paddingHorizontal
-        const percentage = locationX / trackWidth;
+
+        // Calculate position relative to track start
+        const relativeX = gestureState.moveX - trackX.current;
+        const clampedX = Math.max(0, Math.min(relativeX, trackWidth));
+
+        const percentage = clampedX / trackWidth;
         const newPosition = Math.floor(percentage * mediaData.duration);
         setDisplayPosition(newPosition);
       },
@@ -49,13 +58,14 @@ export default function App() {
           setIsSeeking(false);
           return;
         }
-        const locationX = Math.max(0, Math.min(gestureState.moveX - 30, trackWidth));
-        const percentage = locationX / trackWidth;
+        const relativeX = gestureState.moveX - trackX.current;
+        const clampedX = Math.max(0, Math.min(relativeX, trackWidth));
+        const percentage = clampedX / trackWidth;
         const newPosition = Math.floor(percentage * mediaData.duration);
-        
+
         MediaSession.seekTo(newPosition);
         positionRef.current = newPosition;
-        setTimeout(() => setIsSeeking(false), 500); // Delay to prevent jump back
+        setTimeout(() => setIsSeeking(false), 500);
       },
     })
   ).current;
@@ -63,7 +73,7 @@ export default function App() {
   // Manual Seek Handler
   const handleManualSeek = () => {
     if (!seekToTime || !mediaData?.duration) return;
-    
+
     // Parse time string (e.g., "1:30", "90", "1.5")
     let seconds = 0;
     if (seekToTime.includes(':')) {
@@ -74,37 +84,37 @@ export default function App() {
     } else {
       seconds = parseFloat(seekToTime);
     }
-    
+
     if (!isNaN(seconds)) {
       const ms = seconds * 1000; // Convert to ms if user entered seconds, typically seek inputs are in seconds or min:sec
       // Note: If user enters raw ms, that's rare. Let's assume input is seconds or MM:SS
       // Actually, if someone enters "1000", do they mean 1000s or 1000ms? 
       // Music apps usually deal in seconds. Let's standardise on seconds.
       // But wait, our internal logic uses MS.
-      
+
       const targetPos = Math.min(Math.max(0, ms), mediaData.duration);
       MediaSession.seekTo(targetPos);
       positionRef.current = targetPos;
       setDisplayPosition(targetPos);
     }
-    
+
     setShowSeekModal(false);
     setSeekToTime('');
   };
 
   const handleSeekPress = (evt: any) => {
-      // Fallback for simple tap if PanResponder doesn't catch it (though it should)
-      // Actually PanResponder on the container might block simple onPress on children?
-      // We'll attach PanResponder to a view wrapping the track.
-      if (!mediaData?.duration || !trackWidth) return;
+    // Fallback for simple tap if PanResponder doesn't catch it (though it should)
+    // Actually PanResponder on the container might block simple onPress on children?
+    // We'll attach PanResponder to a view wrapping the track.
+    if (!mediaData?.duration || !trackWidth) return;
 
-      const locationX = evt.nativeEvent.locationX;
-      const percentage = Math.max(0, Math.min(1, locationX / trackWidth));
-      const newPosition = Math.floor(percentage * mediaData.duration);
+    const locationX = evt.nativeEvent.locationX;
+    const percentage = Math.max(0, Math.min(1, locationX / trackWidth));
+    const newPosition = Math.floor(percentage * mediaData.duration);
 
-      setDisplayPosition(newPosition);
-      positionRef.current = newPosition;
-      MediaSession.seekTo(newPosition);
+    setDisplayPosition(newPosition);
+    positionRef.current = newPosition;
+    MediaSession.seekTo(newPosition);
   };
 
   const checkPermission = () => {
@@ -122,7 +132,7 @@ export default function App() {
     const mediaSub = MediaSession.addMediaListener((event) => {
       setMediaData(event);
       if (!isSeeking) {
-          positionRef.current = event.position;
+        positionRef.current = event.position;
       }
     });
 
@@ -139,7 +149,7 @@ export default function App() {
       } else if (mediaData) {
         // Correct position drift when paused/updating
         if (Math.abs(displayPosition - mediaData.position) > 2000) {
-             setDisplayPosition(mediaData.position);
+          setDisplayPosition(mediaData.position);
         }
       }
     }, 1000);
@@ -196,7 +206,7 @@ export default function App() {
                 />
               ) : (
                 <View style={styles.artworkPlaceholder}>
-                  <Text style={styles.placeholderIcon}>♪</Text>
+                  <Feather name="music" size={40} color={COLORS.muted} />
                 </View>
               )}
             </View>
@@ -218,12 +228,14 @@ export default function App() {
                   style={styles.progressTrack}
                   onLayout={(e: any) => setTrackWidth(e.nativeEvent.layout.width)}
                 >
-                  <View style={[styles.progressThumb, { width: `${progressPercent}%` }]} />
+                  <View style={[styles.progressThumb, { width: `${progressPercent}%` }]}>
+                    <View style={styles.thumbKnob} />
+                  </View>
                 </View>
               </View>
               <View style={styles.timeLabels}>
                 <TouchableOpacity onPress={() => setShowSeekModal(true)}>
-                    <Text style={[styles.timeValue, styles.timeInteractive]}>{formatTime(displayPosition)}</Text>
+                  <Text style={[styles.timeValue, styles.timeInteractive]}>{formatTime(displayPosition)}</Text>
                 </TouchableOpacity>
                 <Text style={styles.timeValue}>{formatTime(mediaData.duration)}</Text>
               </View>
@@ -232,20 +244,22 @@ export default function App() {
             {/* Controls */}
             <View style={styles.controls}>
               <TouchableOpacity onPress={() => MediaSession.skipPrevious()} style={styles.iconButton}>
-                <Text style={styles.iconText}>⏮</Text>
+                <Feather name="skip-back" size={28} color={COLORS.secondary} />
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => mediaData.state === 'playing' ? MediaSession.pause() : MediaSession.play()}
                 style={styles.playButton}
               >
-                <Text style={styles.playIconText}>
-                  {mediaData.state === 'playing' ? '⏸' : '▶'}
-                </Text>
+                <Feather
+                  name={mediaData.state === 'playing' ? "pause" : "play"}
+                  size={32}
+                  color={COLORS.primary}
+                />
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => MediaSession.skipNext()} style={styles.iconButton}>
-                <Text style={styles.iconText}>⏭</Text>
+                <Feather name="skip-forward" size={28} color={COLORS.secondary} />
               </TouchableOpacity>
             </View>
 
@@ -275,32 +289,32 @@ export default function App() {
         visible={showSeekModal}
         onRequestClose={() => setShowSeekModal(false)}
       >
-        <KeyboardAvoidingView 
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.modalOverlay}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
         >
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>JUMP TO TIME</Text>
             <Text style={styles.modalSubtitle}>Format: MM:SS or Seconds</Text>
-            
+
             <TextInput
-                style={styles.modalInput}
-                placeholder="0:00"
-                placeholderTextColor={COLORS.muted}
-                keyboardType="numeric"
-                value={seekToTime}
-                onChangeText={setSeekToTime}
-                autoFocus
-                onSubmitEditing={handleManualSeek}
+              style={styles.modalInput}
+              placeholder="0:00"
+              placeholderTextColor={COLORS.muted}
+              keyboardType="numeric"
+              value={seekToTime}
+              onChangeText={setSeekToTime}
+              autoFocus
+              onSubmitEditing={handleManualSeek}
             />
-            
+
             <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.modalButtonSecondary} onPress={() => setShowSeekModal(false)}>
-                    <Text style={styles.modalButtonTextSecondary}>CANCEL</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.modalButtonPrimary} onPress={handleManualSeek}>
-                    <Text style={styles.modalButtonTextPrimary}>GO</Text>
-                </TouchableOpacity>
+              <TouchableOpacity style={styles.modalButtonSecondary} onPress={() => setShowSeekModal(false)}>
+                <Text style={styles.modalButtonTextSecondary}>CANCEL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalButtonPrimary} onPress={handleManualSeek}>
+                <Text style={styles.modalButtonTextPrimary}>GO</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -395,10 +409,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  placeholderIcon: {
-    color: COLORS.muted,
-    fontSize: 40,
-  },
   metaInfo: {
     width: '100%',
     marginBottom: 30,
@@ -426,7 +436,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   progressTrack: {
-    height: 4, 
+    height: 4,
     backgroundColor: COLORS.border,
     borderRadius: 2,
   },
@@ -434,10 +444,29 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: COLORS.primary,
     borderRadius: 2,
+    justifyContent: 'center', // Center knob vertically
+  },
+  thumbKnob: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: COLORS.primary,
+    position: 'absolute',
+    right: -6, // Center knob on the end of the bar
+    top: -4, // Adjust based on track height (4px) -> (12 - 4) / 2 = 4 ? No, -4 to center 12px over 4px track
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.5,
+    shadowRadius: 1.41,
+    elevation: 2,
   },
   timeLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 8, // Add space for the knob
   },
   timeValue: {
     color: COLORS.muted,
@@ -445,8 +474,8 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
   },
   timeInteractive: {
-      textDecorationLine: 'underline',
-      color: COLORS.primary,
+    textDecorationLine: 'underline',
+    color: COLORS.primary,
   },
   controls: {
     flexDirection: 'row',
@@ -458,10 +487,6 @@ const styles = StyleSheet.create({
   iconButton: {
     padding: 10,
   },
-  iconText: {
-    color: COLORS.secondary,
-    fontSize: 20,
-  },
   playButton: {
     width: 60,
     height: 60,
@@ -470,10 +495,6 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  playIconText: {
-    color: COLORS.primary,
-    fontSize: 24,
   },
   packageText: {
     color: COLORS.muted,
@@ -505,70 +526,70 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.85)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 30,
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
   },
   modalContent: {
-      width: '100%',
-      backgroundColor: COLORS.surface,
-      borderWidth: 1,
-      borderColor: COLORS.border,
-      padding: 30,
+    width: '100%',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 30,
   },
   modalTitle: {
-      color: COLORS.primary,
-      fontSize: 14,
-      fontWeight: '700',
-      letterSpacing: 2,
-      marginBottom: 5,
-      textAlign: 'center',
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 2,
+    marginBottom: 5,
+    textAlign: 'center',
   },
   modalSubtitle: {
-      color: COLORS.secondary,
-      fontSize: 11,
-      marginBottom: 20,
-      textAlign: 'center',
+    color: COLORS.secondary,
+    fontSize: 11,
+    marginBottom: 20,
+    textAlign: 'center',
   },
   modalInput: {
-      backgroundColor: COLORS.background,
-      color: COLORS.primary,
-      borderWidth: 1,
-      borderColor: COLORS.border,
-      padding: 15,
-      fontSize: 18,
-      textAlign: 'center',
-      marginBottom: 20,
-      fontFamily: 'monospace',
+    backgroundColor: COLORS.background,
+    color: COLORS.primary,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 15,
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 20,
+    fontFamily: 'monospace',
   },
   modalActions: {
-      flexDirection: 'row',
-      gap: 10,
+    flexDirection: 'row',
+    gap: 10,
   },
   modalButtonSecondary: {
-      flex: 1,
-      padding: 12,
-      borderWidth: 1,
-      borderColor: COLORS.border,
-      alignItems: 'center',
+    flex: 1,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
   },
   modalButtonPrimary: {
-      flex: 1,
-      padding: 12,
-      backgroundColor: COLORS.primary,
-      alignItems: 'center',
+    flex: 1,
+    padding: 12,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
   },
   modalButtonTextSecondary: {
-      color: COLORS.secondary,
-      fontSize: 11,
-      fontWeight: '600',
+    color: COLORS.secondary,
+    fontSize: 11,
+    fontWeight: '600',
   },
   modalButtonTextPrimary: {
-      color: COLORS.background,
-      fontSize: 11,
-      fontWeight: '800',
+    color: COLORS.background,
+    fontSize: 11,
+    fontWeight: '800',
   },
 });
 
