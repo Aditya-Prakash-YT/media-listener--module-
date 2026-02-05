@@ -30,22 +30,36 @@ export default function App() {
   const [seekToTime, setSeekToTime] = useState('');
   const [showSeekModal, setShowSeekModal] = useState(false);
   const trackX = useRef(0); // Absolute X position of the track
+  const trackRef = useRef<View>(null);
 
   // PanResponder for drag seeking
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
+      onPanResponderGrant: (evt, gestureState) => {
         setIsSeeking(true);
-        // Calculate track's absolute X position: Touch PageX - Touch Relative Location
-        // This makes it robust to padding/margins without hardcoding '30'
-        trackX.current = evt.nativeEvent.pageX - evt.nativeEvent.locationX;
+        const touchX = evt.nativeEvent.pageX;
+
+        // Measure track position to ensure accuracy
+        trackRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          trackX.current = pageX;
+          setTrackWidth(width);
+
+          // Immediate seek on touch down (tap)
+          if (mediaData?.duration) {
+            const relativeX = touchX - pageX;
+            const clampedX = Math.max(0, Math.min(relativeX, width));
+            const percentage = clampedX / width;
+            const newPosition = Math.floor(percentage * mediaData.duration);
+            setDisplayPosition(newPosition);
+          }
+        });
       },
       onPanResponderMove: (evt, gestureState) => {
         if (!trackWidth || !mediaData?.duration) return;
 
-        // Calculate position relative to track start
+        // Use gestureState.moveX (screen coords) - track absolute X
         const relativeX = gestureState.moveX - trackX.current;
         const clampedX = Math.max(0, Math.min(relativeX, trackWidth));
 
@@ -58,13 +72,29 @@ export default function App() {
           setIsSeeking(false);
           return;
         }
-        const relativeX = gestureState.moveX - trackX.current;
-        const clampedX = Math.max(0, Math.min(relativeX, trackWidth));
-        const percentage = clampedX / trackWidth;
-        const newPosition = Math.floor(percentage * mediaData.duration);
+        // For release, use moveX if available, otherwise fallback to finding pos from last known
+        // Actually moveX is 0 if no move happened (tap). 
+        // If it was a tap, Grant already set the displayPosition.
+        // We just need to commit the seek to the current displayPosition.
 
-        MediaSession.seekTo(newPosition);
-        positionRef.current = newPosition;
+        // However, if we dragged, displayPosition is updated in Move.
+        // So relying on displayPositionRef might be safest? 
+        // But displayPosition is state, we have positionRef.
+        // Let's recalculate to be precise on release point if it was a drag.
+
+        let targetPos = displayPosition; // Default to what we visualized
+
+        if (gestureState.dx !== 0 || gestureState.dy !== 0) {
+          // It was a drag
+          const relativeX = gestureState.moveX - trackX.current;
+          const clampedX = Math.max(0, Math.min(relativeX, trackWidth));
+          const percentage = clampedX / trackWidth;
+          targetPos = Math.floor(percentage * mediaData.duration);
+        }
+
+        MediaSession.seekTo(targetPos);
+        positionRef.current = targetPos;
+        setDisplayPosition(targetPos);
         setTimeout(() => setIsSeeking(false), 500);
       },
     })
@@ -226,7 +256,13 @@ export default function App() {
               >
                 <View
                   style={styles.progressTrack}
-                  onLayout={(e: any) => setTrackWidth(e.nativeEvent.layout.width)}
+                  ref={trackRef}
+                  onLayout={() => {
+                    trackRef.current?.measure((x, y, width, height, pageX, pageY) => {
+                      setTrackWidth(width);
+                      trackX.current = pageX;
+                    });
+                  }}
                 >
                   <View style={[styles.progressThumb, { width: `${progressPercent}%` }]}>
                     <View style={styles.thumbKnob} />
