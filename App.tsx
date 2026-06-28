@@ -1,11 +1,13 @@
-import { useEffect, useState, useRef } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, AppState, Image, StatusBar, Dimensions, PanResponder, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import {
+  StyleSheet, Text, View, TouchableOpacity, Image, StatusBar,
+  PanResponder, Modal, TextInput, KeyboardAvoidingView, Platform,
+  useWindowDimensions, AppState, AppStateStatus
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as MediaSession from './modules/media-session';
 
-const { width } = Dimensions.get('window');
-
-// Sober Color Palette
+// ─── Color Palette ───────────────────────────────────────────
 const COLORS = {
   background: '#000000',
   surface: '#0A0A0A',
@@ -17,98 +19,64 @@ const COLORS = {
   success: '#FFFFFF',
 };
 
-export default function App() {
-  const [permission, setPermission] = useState(false);
-  const [mediaData, setMediaData] = useState<MediaSession.MediaEvent | null>(null);
-  const [status, setStatus] = useState('Initializing...');
-  const positionRef = useRef(0);
-  const [displayPosition, setDisplayPosition] = useState(0);
-  const [trackWidth, setTrackWidth] = useState(0);
+// ─── Helpers ─────────────────────────────────────────────────
+const formatTime = (ms: number): string => {
+  if (typeof ms !== 'number' || isNaN(ms) || ms < 0) return '0:00';
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
 
-  // Seeking State
-  const [isSeeking, setIsSeeking] = useState(false);
+// ─── PermissionCard ──────────────────────────────────────────
+function PermissionCard() {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>PERMISSION REQUIRED</Text>
+      <Text style={styles.cardDesc}>
+        Notification access is needed to listen for media events.
+      </Text>
+      <TouchableOpacity style={styles.primaryButton} onPress={() => MediaSession.requestPermission()}>
+        <Text style={styles.primaryButtonText}>GRANT PERMISSION</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─── IdleView ────────────────────────────────────────────────
+function IdleView() {
+  return (
+    <View style={styles.idleView}>
+      <Text style={styles.idleMessage}>READY FOR PLAYBACK</Text>
+      <Text style={styles.idleSubMessage}>No active media session detected</Text>
+    </View>
+  );
+}
+
+// ─── SeekModal ───────────────────────────────────────────────
+interface SeekModalProps {
+  visible: boolean;
+  duration: number;
+  onSeek: (positionMs: number) => void;
+  onClose: () => void;
+}
+
+function SeekModal({ visible, duration, onSeek, onClose }: SeekModalProps) {
   const [seekToTime, setSeekToTime] = useState('');
-  const [showSeekModal, setShowSeekModal] = useState(false);
-  const trackX = useRef(0); // Absolute X position of the track
-  const trackRef = useRef<View>(null);
 
-  // PanResponder for drag seeking
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt, gestureState) => {
-        setIsSeeking(true);
-        const touchX = evt.nativeEvent.pageX;
+  const handleSubmit = useCallback(() => {
+    if (!seekToTime) return;
 
-        // Measure track position to ensure accuracy
-        trackRef.current?.measure((x, y, width, height, pageX, pageY) => {
-          trackX.current = pageX;
-          setTrackWidth(width);
-
-          // Immediate seek on touch down (tap)
-          if (mediaData?.duration) {
-            const relativeX = touchX - pageX;
-            const clampedX = Math.max(0, Math.min(relativeX, width));
-            const percentage = clampedX / width;
-            const newPosition = Math.floor(percentage * mediaData.duration);
-            setDisplayPosition(newPosition);
-          }
-        });
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        if (!trackWidth || !mediaData?.duration) return;
-
-        // Use gestureState.moveX (screen coords) - track absolute X
-        const relativeX = gestureState.moveX - trackX.current;
-        const clampedX = Math.max(0, Math.min(relativeX, trackWidth));
-
-        const percentage = clampedX / trackWidth;
-        const newPosition = Math.floor(percentage * mediaData.duration);
-        setDisplayPosition(newPosition);
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        if (!trackWidth || !mediaData?.duration) {
-          setIsSeeking(false);
-          return;
-        }
-        // For release, use moveX if available, otherwise fallback to finding pos from last known
-        // Actually moveX is 0 if no move happened (tap). 
-        // If it was a tap, Grant already set the displayPosition.
-        // We just need to commit the seek to the current displayPosition.
-
-        // However, if we dragged, displayPosition is updated in Move.
-        // So relying on displayPositionRef might be safest? 
-        // But displayPosition is state, we have positionRef.
-        // Let's recalculate to be precise on release point if it was a drag.
-
-        let targetPos = displayPosition; // Default to what we visualized
-
-        if (gestureState.dx !== 0 || gestureState.dy !== 0) {
-          // It was a drag
-          const relativeX = gestureState.moveX - trackX.current;
-          const clampedX = Math.max(0, Math.min(relativeX, trackWidth));
-          const percentage = clampedX / trackWidth;
-          targetPos = Math.floor(percentage * mediaData.duration);
-        }
-
-        MediaSession.seekTo(targetPos);
-        positionRef.current = targetPos;
-        setDisplayPosition(targetPos);
-        setTimeout(() => setIsSeeking(false), 500);
-      },
-    })
-  ).current;
-
-  // Manual Seek Handler
-  const handleManualSeek = () => {
-    if (!seekToTime || !mediaData?.duration) return;
-
-    // Parse time string (e.g., "1:30", "90", "1.5")
     let seconds = 0;
     if (seekToTime.includes(':')) {
       const parts = seekToTime.split(':');
-      if (parts.length === 2) {
+      if (parts.length === 3) {
+        seconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+      } else if (parts.length === 2) {
         seconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
       }
     } else {
@@ -116,92 +84,300 @@ export default function App() {
     }
 
     if (!isNaN(seconds)) {
-      const ms = seconds * 1000; // Convert to ms if user entered seconds, typically seek inputs are in seconds or min:sec
-      // Note: If user enters raw ms, that's rare. Let's assume input is seconds or MM:SS
-      // Actually, if someone enters "1000", do they mean 1000s or 1000ms? 
-      // Music apps usually deal in seconds. Let's standardise on seconds.
-      // But wait, our internal logic uses MS.
-
-      const targetPos = Math.min(Math.max(0, ms), mediaData.duration);
-      MediaSession.seekTo(targetPos);
-      positionRef.current = targetPos;
-      setDisplayPosition(targetPos);
+      const ms = seconds * 1000;
+      const clamped = Math.min(Math.max(0, ms), duration);
+      onSeek(clamped);
     }
 
-    setShowSeekModal(false);
     setSeekToTime('');
-  };
+    onClose();
+  }, [seekToTime, duration, onSeek, onClose]);
 
-  const handleSeekPress = (evt: any) => {
-    // Fallback for simple tap if PanResponder doesn't catch it (though it should)
-    // Actually PanResponder on the container might block simple onPress on children?
-    // We'll attach PanResponder to a view wrapping the track.
-    if (!mediaData?.duration || !trackWidth) return;
+  return (
+    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalOverlay}
+      >
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>JUMP TO TIME</Text>
+          <Text style={styles.modalSubtitle}>Format: MM:SS or Seconds</Text>
+          <TextInput
+            style={styles.modalInput}
+            placeholder="0:00"
+            placeholderTextColor={COLORS.muted}
+            keyboardType="numeric"
+            value={seekToTime}
+            onChangeText={setSeekToTime}
+            autoFocus
+            onSubmitEditing={handleSubmit}
+          />
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.modalButtonSecondary} onPress={onClose}>
+              <Text style={styles.modalButtonTextSecondary}>CANCEL</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalButtonPrimary} onPress={handleSubmit}>
+              <Text style={styles.modalButtonTextPrimary}>GO</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
 
-    const locationX = evt.nativeEvent.locationX;
-    const percentage = Math.max(0, Math.min(1, locationX / trackWidth));
-    const newPosition = Math.floor(percentage * mediaData.duration);
+// ─── PlayerControls ──────────────────────────────────────────
+interface PlayerControlsProps {
+  state: string;
+}
 
-    setDisplayPosition(newPosition);
-    positionRef.current = newPosition;
-    MediaSession.seekTo(newPosition);
-  };
+function PlayerControls({ state }: PlayerControlsProps) {
+  return (
+    <View style={styles.controls}>
+      <TouchableOpacity onPress={() => MediaSession.skipPrevious()} style={styles.iconButton}>
+        <Feather name="skip-back" size={28} color={COLORS.secondary} />
+      </TouchableOpacity>
 
-  const checkPermission = () => {
+      <TouchableOpacity
+        onPress={() => state === 'playing' ? MediaSession.pause() : MediaSession.play()}
+        style={styles.playButton}
+      >
+        <Feather
+          name={state === 'playing' ? 'pause' : 'play'}
+          size={32}
+          color={COLORS.background} 
+        />
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={() => MediaSession.skipNext()} style={styles.iconButton}>
+        <Feather name="skip-forward" size={28} color={COLORS.secondary} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─── ProgressBar ─────────────────────────────────────────────
+interface ProgressBarProps {
+  displayPosition: number;
+  duration: number;
+  onSeekCommit: (positionMs: number) => void;
+  onSeekStart: () => void;
+  onSeekEnd: () => void;
+  onTimeTap: () => void;
+}
+
+function ProgressBar({
+  displayPosition, duration, onSeekCommit, onSeekStart, onSeekEnd, onTimeTap,
+}: ProgressBarProps) {
+  const trackRef = useRef<View>(null);
+  const trackLayoutRef = useRef({ width: 0, pageX: 0 });
+  const [localPosition, setLocalPosition] = useState(displayPosition);
+  const isSeekingRef = useRef(false);
+
+  useEffect(() => {
+    if (!isSeekingRef.current) {
+      setLocalPosition(displayPosition);
+    }
+  }, [displayPosition]);
+
+  const durationRef = useRef(duration);
+  durationRef.current = duration;
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: (evt) => {
+      isSeekingRef.current = true;
+      onSeekStart();
+      trackRef.current?.measure((_x, _y, w, _h, pageX) => {
+        trackLayoutRef.current = { width: w, pageX };
+        if (durationRef.current > 0) {
+          const relativeX = evt.nativeEvent.pageX - pageX;
+          const pct = Math.max(0, Math.min(1, relativeX / w));
+          setLocalPosition(Math.floor(pct * durationRef.current));
+        }
+      });
+    },
+    onPanResponderMove: (evt) => {
+      const { width, pageX } = trackLayoutRef.current;
+      if (!width || durationRef.current <= 0) return;
+      const relativeX = evt.nativeEvent.pageX - pageX;
+      const pct = Math.max(0, Math.min(1, relativeX / width));
+      setLocalPosition(Math.floor(pct * durationRef.current));
+    },
+    onPanResponderRelease: (evt, gesture) => {
+      const { width, pageX } = trackLayoutRef.current;
+      if (!width || durationRef.current <= 0) {
+        isSeekingRef.current = false;
+        onSeekEnd();
+        return;
+      }
+      let targetPos: number;
+      if (gesture.dx !== 0 || gesture.dy !== 0) {
+        const relativeX = evt.nativeEvent.pageX - pageX;
+        const pct = Math.max(0, Math.min(1, relativeX / width));
+        targetPos = Math.floor(pct * durationRef.current);
+      } else {
+        targetPos = localPosition;
+      }
+      onSeekCommit(targetPos);
+      setLocalPosition(targetPos);
+      setTimeout(() => {
+        isSeekingRef.current = false;
+        onSeekEnd();
+      }, 500);
+    },
+  }), [onSeekStart, onSeekEnd, onSeekCommit, localPosition]);
+
+  const progressPct = duration > 0 ? Math.min((localPosition / duration) * 100, 100) : 0;
+
+  return (
+    <View style={styles.progressContainer}>
+      <View {...panResponder.panHandlers} style={styles.progressTouchArea}>
+        <View
+          style={styles.progressTrack}
+          ref={trackRef}
+          onLayout={() => {
+            trackRef.current?.measure((_x, _y, w, _h, pageX) => {
+              trackLayoutRef.current = { width: w, pageX };
+            });
+          }}
+        >
+          <View style={[styles.progressThumb, { width: `${progressPct}%` }]}>
+            <View style={styles.thumbKnob} />
+          </View>
+        </View>
+      </View>
+      <View style={styles.timeLabels}>
+        <TouchableOpacity onPress={onTimeTap}>
+          <Text style={[styles.timeValue, styles.timeInteractive]}>{formatTime(localPosition)}</Text>
+        </TouchableOpacity>
+        <Text style={styles.timeValue}>{formatTime(duration)}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ─── PlayerView ──────────────────────────────────────────────
+interface PlayerViewProps {
+  mediaData: MediaSession.MediaEvent;
+  onTimeTap: () => void;
+}
+
+function PlayerView({ mediaData, onTimeTap }: PlayerViewProps) {
+  const { width } = useWindowDimensions();
+  const artworkSize = width * 0.7;
+
+  const [displayPosition, setDisplayPosition] = useState(mediaData.position);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const positionRef = useRef(displayPosition);
+
+  // Sync from native events
+  useEffect(() => {
+    if (!isSeeking) {
+      setDisplayPosition(mediaData.position);
+      positionRef.current = mediaData.position;
+    }
+  }, [mediaData.position, isSeeking]);
+
+  // Fast-updating ticker
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (isSeeking || mediaData.state !== 'playing') return;
+      const duration = mediaData.duration || Infinity;
+      positionRef.current = Math.min(positionRef.current + 1000, duration);
+      setDisplayPosition(positionRef.current);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isSeeking, mediaData.state, mediaData.duration]);
+
+  const handleSeekCommit = useCallback((positionMs: number) => {
+    MediaSession.seekTo(positionMs);
+    positionRef.current = positionMs;
+    setDisplayPosition(positionMs);
+  }, []);
+
+  return (
+    <View style={styles.playerWrapper}>
+      {/* Artwork */}
+      <View style={[styles.artworkContainer, { width: artworkSize, height: artworkSize }]}>
+        {mediaData.artworkUri ? (
+          <Image
+            source={{ uri: mediaData.artworkUri }}
+            style={styles.artwork}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.artworkPlaceholder}>
+            <Feather name="music" size={40} color={COLORS.muted} />
+          </View>
+        )}
+      </View>
+
+      {/* Metadata */}
+      <View style={styles.metaInfo}>
+        <Text style={styles.titleText} numberOfLines={1}>{mediaData.title || 'No Title'}</Text>
+        <Text style={styles.artistText} numberOfLines={1}>{mediaData.artist || 'Unknown Artist'}</Text>
+        <Text style={styles.albumText} numberOfLines={1}>{mediaData.album || 'No Album'}</Text>
+      </View>
+
+      {/* Progress */}
+      <ProgressBar
+        displayPosition={displayPosition}
+        duration={mediaData.duration}
+        onSeekCommit={handleSeekCommit}
+        onSeekStart={() => setIsSeeking(true)}
+        onSeekEnd={() => setIsSeeking(false)}
+        onTimeTap={onTimeTap}
+      />
+
+      {/* Controls */}
+      <PlayerControls state={mediaData.state} />
+
+      <Text style={styles.packageText}>{mediaData.package}</Text>
+
+      {/* Footer / Debug */}
+      <View style={styles.footerInner}>
+        <Text style={styles.debugText}>
+          {mediaData.state.toUpperCase()} • {formatTime(displayPosition)} / {formatTime(mediaData.duration)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ─── Main App ────────────────────────────────────────────────
+export default function App() {
+  const [permission, setPermission] = useState(false);
+  const [mediaData, setMediaData] = useState<MediaSession.MediaEvent | null>(null);
+  const [showSeekModal, setShowSeekModal] = useState(false);
+
+  const checkPermission = useCallback(() => {
     try {
       setPermission(MediaSession.hasPermission());
-      setStatus('System Ready');
-    } catch (err: any) {
-      setStatus(`System Error: ${err.message}`);
-    }
-  };
+    } catch (_err) { /* module not ready */ }
+  }, []);
 
   useEffect(() => {
     checkPermission();
 
     const mediaSub = MediaSession.addMediaListener((event) => {
       setMediaData(event);
-      if (!isSeeking) {
-        positionRef.current = event.position;
-      }
     });
 
-    const appSub = AppState.addEventListener('change', (state) => {
+    const appSub = AppState.addEventListener('change', (state: AppStateStatus) => {
       if (state === 'active') checkPermission();
     });
-
-    const positionInterval = setInterval(() => {
-      if (isSeeking) return; // Don't fight the user
-
-      if (mediaData?.state === 'playing') {
-        positionRef.current += 1000;
-        setDisplayPosition(positionRef.current);
-      } else if (mediaData) {
-        // Correct position drift when paused/updating
-        if (Math.abs(displayPosition - mediaData.position) > 2000) {
-          setDisplayPosition(mediaData.position);
-        }
-      }
-    }, 1000);
 
     return () => {
       mediaSub.remove();
       appSub.remove();
-      clearInterval(positionInterval);
     };
-  }, [mediaData?.state, mediaData?.position, isSeeking]);
+  }, [checkPermission]);
 
-  const formatTime = (ms: number) => {
-    if (!ms || ms < 0) return '0:00';
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  const progressPercent = mediaData?.duration
-    ? Math.min((displayPosition / mediaData.duration) * 100, 100)
-    : 0;
+  const handleModalSeek = useCallback((positionMs: number) => {
+    MediaSession.seekTo(positionMs);
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -215,155 +391,34 @@ export default function App() {
 
       <View style={styles.mainContent}>
         {!permission ? (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>PERMISSION REQUIRED</Text>
-            <Text style={styles.cardDesc}>
-              Notification access is needed to listen for media events.
-            </Text>
-            <TouchableOpacity style={styles.primaryButton} onPress={() => MediaSession.requestPermission()}>
-              <Text style={styles.primaryButtonText}>GRANT PERMISSION</Text>
-            </TouchableOpacity>
-          </View>
+          <PermissionCard />
         ) : mediaData ? (
-          <View style={styles.playerWrapper}>
-            {/* Artwork */}
-            <View style={styles.artworkContainer}>
-              {mediaData.artworkUri ? (
-                <Image
-                  source={{ uri: mediaData.artworkUri }}
-                  style={styles.artwork}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={styles.artworkPlaceholder}>
-                  <Feather name="music" size={40} color={COLORS.muted} />
-                </View>
-              )}
-            </View>
-
-            {/* Metadata */}
-            <View style={styles.metaInfo}>
-              <Text style={styles.titleText} numberOfLines={1}>{mediaData.title || 'No Title'}</Text>
-              <Text style={styles.artistText} numberOfLines={1}>{mediaData.artist || 'Unknown Artist'}</Text>
-              <Text style={styles.albumText} numberOfLines={1}>{mediaData.album || 'No Album'}</Text>
-            </View>
-
-            {/* Progress */}
-            <View style={styles.progressContainer}>
-              <View
-                {...panResponder.panHandlers}
-                style={styles.progressTouchArea}
-              >
-                <View
-                  style={styles.progressTrack}
-                  ref={trackRef}
-                  onLayout={() => {
-                    trackRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                      setTrackWidth(width);
-                      trackX.current = pageX;
-                    });
-                  }}
-                >
-                  <View style={[styles.progressThumb, { width: `${progressPercent}%` }]}>
-                    <View style={styles.thumbKnob} />
-                  </View>
-                </View>
-              </View>
-              <View style={styles.timeLabels}>
-                <TouchableOpacity onPress={() => setShowSeekModal(true)}>
-                  <Text style={[styles.timeValue, styles.timeInteractive]}>{formatTime(displayPosition)}</Text>
-                </TouchableOpacity>
-                <Text style={styles.timeValue}>{formatTime(mediaData.duration)}</Text>
-              </View>
-            </View>
-
-            {/* Controls */}
-            <View style={styles.controls}>
-              <TouchableOpacity onPress={() => MediaSession.skipPrevious()} style={styles.iconButton}>
-                <Feather name="skip-back" size={28} color={COLORS.secondary} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => mediaData.state === 'playing' ? MediaSession.pause() : MediaSession.play()}
-                style={styles.playButton}
-              >
-                <Feather
-                  name={mediaData.state === 'playing' ? "pause" : "play"}
-                  size={32}
-                  color={COLORS.primary}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={() => MediaSession.skipNext()} style={styles.iconButton}>
-                <Feather name="skip-forward" size={28} color={COLORS.secondary} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.packageText}>{mediaData.package}</Text>
-          </View>
+          <PlayerView
+            mediaData={mediaData}
+            onTimeTap={() => setShowSeekModal(true)}
+          />
         ) : (
-          <View style={styles.idleView}>
-            <Text style={styles.idleMessage}>READY FOR PLAYBACK</Text>
-            <Text style={styles.idleSubMessage}>No active media session detected</Text>
-          </View>
+          <IdleView />
         )}
       </View>
 
-      {/* Footer / Debug */}
-      {mediaData && (
-        <View style={styles.footer}>
-          <Text style={styles.debugText}>
-            {mediaData.state.toUpperCase()} • {formatTime(displayPosition)} / {formatTime(mediaData.duration)}
-          </Text>
-        </View>
-      )}
-
-      {/* Manual Seek Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
+      {/* Seek Modal */}
+      <SeekModal
         visible={showSeekModal}
-        onRequestClose={() => setShowSeekModal(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.modalOverlay}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>JUMP TO TIME</Text>
-            <Text style={styles.modalSubtitle}>Format: MM:SS or Seconds</Text>
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="0:00"
-              placeholderTextColor={COLORS.muted}
-              keyboardType="numeric"
-              value={seekToTime}
-              onChangeText={setSeekToTime}
-              autoFocus
-              onSubmitEditing={handleManualSeek}
-            />
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalButtonSecondary} onPress={() => setShowSeekModal(false)}>
-                <Text style={styles.modalButtonTextSecondary}>CANCEL</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalButtonPrimary} onPress={handleManualSeek}>
-                <Text style={styles.modalButtonTextPrimary}>GO</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        duration={mediaData?.duration ?? 0}
+        onSeek={handleModalSeek}
+        onClose={() => setShowSeekModal(false)}
+      />
     </View>
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingTop: 60,
+    paddingTop: StatusBar.currentHeight ?? 60,
   },
   header: {
     flexDirection: 'row',
@@ -398,7 +453,7 @@ const styles = StyleSheet.create({
     padding: 30,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 2,
+    borderRadius: 8,
   },
   cardTitle: {
     color: COLORS.primary,
@@ -417,7 +472,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     paddingVertical: 12,
     alignItems: 'center',
-    borderRadius: 2,
+    borderRadius: 4,
   },
   primaryButtonText: {
     color: COLORS.background,
@@ -427,14 +482,15 @@ const styles = StyleSheet.create({
   },
   playerWrapper: {
     alignItems: 'center',
+    width: '100%',
   },
   artworkContainer: {
-    width: width * 0.7,
-    aspectRatio: 1,
     marginBottom: 40,
     borderWidth: 1,
     borderColor: COLORS.border,
     backgroundColor: COLORS.surface,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   artwork: {
     width: '100%',
@@ -480,7 +536,7 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: COLORS.primary,
     borderRadius: 2,
-    justifyContent: 'center', // Center knob vertically
+    justifyContent: 'center',
   },
   thumbKnob: {
     width: 12,
@@ -488,13 +544,10 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: COLORS.primary,
     position: 'absolute',
-    right: -6, // Center knob on the end of the bar
-    top: -4, // Adjust based on track height (4px) -> (12 - 4) / 2 = 4 ? No, -4 to center 12px over 4px track
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
+    right: -6,
+    top: -4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.5,
     shadowRadius: 1.41,
     elevation: 2,
@@ -502,7 +555,7 @@ const styles = StyleSheet.create({
   timeLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8, // Add space for the knob
+    marginTop: 8,
   },
   timeValue: {
     color: COLORS.muted,
@@ -527,8 +580,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -551,8 +603,9 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
     fontSize: 11,
   },
-  footer: {
-    padding: 30,
+  footerInner: {
+    marginTop: 30,
+    padding: 10,
   },
   debugText: {
     color: COLORS.muted,
@@ -574,6 +627,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     padding: 30,
+    borderRadius: 8,
   },
   modalTitle: {
     color: COLORS.primary,
@@ -599,6 +653,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
     fontFamily: 'monospace',
+    borderRadius: 4,
   },
   modalActions: {
     flexDirection: 'row',
@@ -610,12 +665,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     alignItems: 'center',
+    borderRadius: 4,
   },
   modalButtonPrimary: {
     flex: 1,
     padding: 12,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
+    borderRadius: 4,
   },
   modalButtonTextSecondary: {
     color: COLORS.secondary,
@@ -628,4 +685,3 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 });
-

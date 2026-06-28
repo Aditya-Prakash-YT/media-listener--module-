@@ -6,18 +6,11 @@ import android.content.Intent
 import android.provider.Settings
 import android.os.Bundle
 import android.media.session.PlaybackState
+import android.util.Log
 
 class MediaSessionModule : Module() {
-    // Shared cache for synchronous calls? 
-    // Ideally we'd share with Service, but they are different instances/contexts.
-    // For synchronous getState, we just want to avoid creating a NEW file if we don't have to,
-    // BUT we don't have persistent state between calls easily here unless we use a companion object or similar.
-    // Actually, simple static map in companion object of Service is accessible!
-    // But let's just use a local static map here for the Module instance.
-    
-    private data class ArtCache(val signature: String, val timestamp: Long)
     companion object {
-        private val artworkCache = mutableMapOf<String, ArtCache>()
+        private const val TAG = "MediaSessionModule"
     }
 
     override fun definition() = ModuleDefinition {
@@ -71,8 +64,16 @@ class MediaSessionModule : Module() {
                 PlaybackState.STATE_BUFFERING -> "buffering"
                 else -> "unknown"
             }
+
+            // Use shared helper — single source of truth for artwork resolution
+            val artworkUri = try {
+                ArtworkHelper.resolveArtworkUri(controller, context.cacheDir)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error resolving artwork in getState", e)
+                null
+            }
             
-            mapOf(
+            val result = mutableMapOf<String, Any?>(
                 "package" to controller.packageName,
                 "title" to (metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: ""),
                 "artist" to (metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST) ?: ""),
@@ -80,71 +81,13 @@ class MediaSessionModule : Module() {
                 "state" to stateString,
                 "position" to (state?.position ?: 0L),
                 "duration" to (metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: 0L)
-            ).apply {
-                // Determine artworkUri similar to Service logic for initial state get
-                // Note: ideally we factor this logic out, but for now we approximate or wait for event
-                // Actually, getState is often called first.
-                // However, accessing context.cacheDir here is easy.
-                // But the service saves the file. We should check if the file exists or rely on the service to emit it.
-                // For direct synchronous getState, extracting bitmap again is heavy.
-                // A better approach for getState:
-                // We don't have easy access to the Bitmap here without the controller callbacks or re-querying.
-                // Let's rely on the event or just try to check if the file exists from previous service runs?
-                // No, that's flaky.
-                // Let's just return null for artworkUri in synchronous getState for now, 
-                // OR duplicate the extraction logic if we really want it. 
-                // Given the user asked for "event.mediaGraphic", the event is the primary mechanism.
-                // But consistency is good. Let's trying to support it if easy.
-                
-                // Retrying extraction with cache logic:
-                var artworkUri: String? = null
-                try {
-                     val title = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: ""
-                     val album = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM) ?: ""
-                     val signature = "$title|$album"
-                     
-                     val bitmap = metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART)
-                        ?: metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART)
-                     
-                     if (bitmap != null) {
-                         val cache = artworkCache[controller.packageName]
-                         val ts: Long
-                         
-                         if (cache != null && cache.signature == signature) {
-                             ts = cache.timestamp
-                         } else {
-                             ts = System.currentTimeMillis()
-                             val file = java.io.File(context.cacheDir, "album_art_${controller.packageName}.png")
-                             val stream = java.io.FileOutputStream(file)
-                             bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
-                             stream.close()
-                             artworkCache[controller.packageName] = ArtCache(signature, ts)
-                         }
-                         
-                         val file = java.io.File(context.cacheDir, "album_art_${controller.packageName}.png")
-                         artworkUri = "file://${file.absolutePath}?ts=$ts"
-                     } else {
-                         val artUriStr = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART_URI)
-                            ?: metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ART_URI)
-                         
-                         if (artUriStr != null) {
-                             val cache = artworkCache[controller.packageName]
-                             val ts: Long
-                             if (cache != null && cache.signature == signature) {
-                                ts = cache.timestamp
-                             } else {
-                                ts = System.currentTimeMillis()
-                                artworkCache[controller.packageName] = ArtCache(signature, ts)
-                             }
-                             artworkUri = "$artUriStr?ts=$ts"
-                         }
-                     }
-                } catch(e: Exception) {}
-                
-                if (artworkUri != null) {
-                    (this as MutableMap<String, Any?>)["artworkUri"] = artworkUri
-                }
+            )
+
+            if (artworkUri != null) {
+                result["artworkUri"] = artworkUri
             }
+
+            result
         }
 
         OnStartObserving {

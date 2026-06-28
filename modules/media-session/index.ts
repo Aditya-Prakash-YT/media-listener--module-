@@ -1,8 +1,6 @@
-import { requireNativeModule, EventEmitter } from 'expo-modules-core';
-import { EventSubscription } from 'react-native';
+import { requireNativeModule, EventSubscription } from 'expo-modules-core';
 
 const MediaSessionModule = requireNativeModule('MediaSession');
-const emitter = new EventEmitter(MediaSessionModule);
 
 export interface MediaEvent {
     package: string;
@@ -25,7 +23,7 @@ export function hasPermission(): boolean {
 }
 
 export function addMediaListener(listener: (event: MediaEvent) => void): EventSubscription {
-    return (emitter as any).addListener('onMediaChanged', listener);
+    return MediaSessionModule.addListener('onMediaChanged', listener);
 }
 
 export function getState(): MediaEvent | null {

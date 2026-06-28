@@ -19,12 +19,10 @@ class MediaSessionService : NotificationListenerService() {
 
     companion object {
         private const val TAG = "MediaSessionService"
+        @Volatile
         var activeController: MediaController? = null
             private set
     }
-    
-    private data class ArtCache(val signature: String, val timestamp: Long)
-    private val artworkCache = mutableMapOf<String, ArtCache>()
 
     private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
         mainHandler.post {
@@ -51,7 +49,9 @@ class MediaSessionService : NotificationListenerService() {
         
         sessionManager?.removeOnActiveSessionsChangedListener(sessionsListener)
         
-        controllerCallbacks.forEach { (controller, callback) ->
+        // Safe copy to avoid ConcurrentModificationException
+        val entries = controllerCallbacks.entries.toList()
+        entries.forEach { (controller, callback) ->
             controller.unregisterCallback(callback)
         }
         controllerCallbacks.clear()
@@ -64,11 +64,12 @@ class MediaSessionService : NotificationListenerService() {
         val currentPackages = controllers?.map { it.packageName }?.toSet() ?: emptySet()
         val registeredPackages = controllerCallbacks.keys.map { it.packageName }.toSet()
         
-        controllerCallbacks.entries.removeAll { (controller, callback) ->
-            if (controller.packageName !in currentPackages) {
+        // Safe removal — snapshot keys first to avoid ConcurrentModificationException
+        val toRemove = controllerCallbacks.keys.filter { it.packageName !in currentPackages }
+        toRemove.forEach { controller ->
+            controllerCallbacks.remove(controller)?.let { callback ->
                 controller.unregisterCallback(callback)
-                true
-            } else false
+            }
         }
         
         controllers?.forEach { controller ->
@@ -118,62 +119,8 @@ class MediaSessionService : NotificationListenerService() {
             else -> "unknown"
         }
 
-        var artworkUri: String? = null
-        try {
-            val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
-            val album = metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: ""
-            val signature = "$title|$album"
-
-             // Try to get the art bitmap
-            val bitmap = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
-                ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
-
-            if (bitmap != null) {
-                // Check cache
-                val cache = artworkCache[controller.packageName]
-                val ts: Long
-                
-                 if (cache != null && cache.signature == signature) {
-                    // Reuse timestamp, do not write file
-                    ts = cache.timestamp
-                 } else {
-                    // New track or first time, write file and update cache
-                    ts = System.currentTimeMillis()
-                    val file = java.io.File(cacheDir, "album_art_${controller.packageName}.png")
-                    val stream = java.io.FileOutputStream(file)
-                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
-                    stream.close()
-                    artworkCache[controller.packageName] = ArtCache(signature, ts)
-                 }
-
-                val file = java.io.File(cacheDir, "album_art_${controller.packageName}.png")
-                artworkUri = "file://${file.absolutePath}?ts=$ts"
-            } else {
-                 // Try string uri if bitmap is missing (less common for local players but possible)
-                 val artUriStr = metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI)
-                    ?: metadata?.getString(MediaMetadata.METADATA_KEY_ART_URI)
-                 if (artUriStr != null) {
-                     // For URI strings, we can also try to be smart, but they usually don't flash as much unless we append new ts every time.
-                     // The previous fix appended TS every time. Let's apply similar logic or just act as pass-through?
-                     // If the URI string itself changes, the image view updates. 
-                     // If we append a constantly changing TS to a static URI, it flashes.
-                     // So we should map the external URI to a cached version too?
-                     // Simplest: Use signature logic for this too.
-                     
-                     val cache = artworkCache[controller.packageName]
-                     val ts: Long
-                     if (cache != null && cache.signature == signature) {
-                        ts = cache.timestamp
-                     } else {
-                        ts = System.currentTimeMillis()
-                        artworkCache[controller.packageName] = ArtCache(signature, ts)
-                     }
-                     artworkUri = "$artUriStr?ts=$ts"
-                 }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error saving artwork", e)
-        }
+        // Use shared helper — no more duplicated artwork logic
+        val artworkUri = ArtworkHelper.resolveArtworkUri(controller, cacheDir)
 
         val bundle = Bundle().apply {
             putString("package", controller.packageName)

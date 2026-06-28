@@ -12,6 +12,7 @@
     "@expo/vector-icons": "^15.0.3",
     "expo": "^55.0.12",
     "expo-status-bar": "~55.0.5",
+    "media-session": "file:modules/media-session",
     "react": "19.2.0",
     "react-native": "0.83.4"
   },
