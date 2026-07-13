@@ -1,18 +1,22 @@
 {
-    "name": "media-session",
-    "version": "1.0.0",
-    "main": "index.ts",
-    "types": "index.ts",
-    "scripts": {
-        "pack-time": "node pack.js"
-    },
-    "dependencies": {},
-    "peerDependencies": {
-        "expo": "*",
-        "react": "*",
-        "react-native": "*"
-    },
-    "devDependencies": {
-        "expo-modules-core": "~2.0.0"
-    }
+  "name": "media-session",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "types": "index.ts",
+  "scripts": {
+    "pack-time": "node pack.js"
+  },
+  "dependencies": {
+    "expo": "~57.0.4",
+    "react": "19.2.3",
+    "react-native": "0.86.0"
+  },
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  },
+  "devDependencies": {
+    "expo-modules-core": "~2.0.0"
+  }
 }

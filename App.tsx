@@ -4,7 +4,7 @@ import {
   PanResponder, Modal, TextInput, KeyboardAvoidingView, Platform,
   useWindowDimensions, AppState, AppStateStatus
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import Icon from '@react-native-vector-icons/material-design-icons'
 import * as MediaSession from './modules/media-session';
 
 // ─── Color Palette ───────────────────────────────────────────
@@ -135,14 +135,14 @@ function PlayerControls({ state }: PlayerControlsProps) {
   return (
     <View style={styles.controls}>
       <TouchableOpacity onPress={() => MediaSession.skipPrevious()} style={styles.iconButton}>
-        <Feather name="skip-back" size={28} color={COLORS.secondary} />
+        <Icon name="skip-previous-outline" size={28} color={COLORS.secondary} />
       </TouchableOpacity>
 
       <TouchableOpacity
         onPress={() => state === 'playing' ? MediaSession.pause() : MediaSession.play()}
         style={styles.playButton}
       >
-        <Feather
+        <Icon
           name={state === 'playing' ? 'pause' : 'play'}
           size={32}
           color={COLORS.background} 
@@ -150,7 +150,7 @@ function PlayerControls({ state }: PlayerControlsProps) {
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => MediaSession.skipNext()} style={styles.iconButton}>
-        <Feather name="skip-forward" size={28} color={COLORS.secondary} />
+        <Icon name="skip-next-outline" size={28} color={COLORS.secondary} />
       </TouchableOpacity>
     </View>
   );
@@ -309,7 +309,7 @@ function PlayerView({ mediaData, onTimeTap }: PlayerViewProps) {
           />
         ) : (
           <View style={styles.artworkPlaceholder}>
-            <Feather name="music" size={40} color={COLORS.muted} />
+            <Icon name="music-box" size={40} color={COLORS.muted} />
           </View>
         )}
       </View>
