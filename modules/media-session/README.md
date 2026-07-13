@@ -192,6 +192,7 @@ if (current) {
 
 ## 📝 Changelog
 
+**v3.0.2** — Compatability with Expo 57.x.x, switched to @react-native-vector-icons/material-design-icons  
 **v3.0.1** — Smart artwork caching, seek bar thumb, Feather icons  
 **v3.0.0** — `seekTo()`, manual time entry, draggable seek bar  
 **v2.0.0** — Artwork extraction, `getState()`  
