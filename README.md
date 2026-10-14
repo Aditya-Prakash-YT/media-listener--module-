@@ -1,6 +1,6 @@
 # 🎵 Media Session Listener
 
-**Version 3.0 Patch 1**
+**Version 3.0.4**
 
 A powerful **Expo Native Module** for Android that leverages the `MediaSessionManager` API to listen for media playback events from *any* active media app (Spotify, YouTube, Apple Music, etc.) on the device.
 
@@ -585,6 +585,19 @@ MediaSession.seekTo(120000);
 ---
 
 ## 📝 Changelog
+
+### v3.0.4
+- **Updated**: Upgraded Expo to latest SDK 57 (`^57.0.28`).
+- **Updated**: Upgraded React Native to `0.86.3`.
+- **Updated**: Updated all Expo packages (`expo-font`, `expo-status-bar`, `expo-splash-screen`) and libraries to latest compatible versions.
+- **Updated**: Migrated splash screen configuration to the `expo-splash-screen` config plugin format.
+- **Updated**: Compiled clean native Android release APK build version 3.0.4.
+
+### v3.0.3
+- Minor internal codebase improvement.
+
+### v3.0.2
+- Minor internal codebase improvement.
 
 ### v3.0.1 (Patch 1)
 - **Fixed**: Album artwork flashing on every event.

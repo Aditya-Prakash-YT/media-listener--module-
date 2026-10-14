@@ -1,6 +1,6 @@
 # 🎵 Media Session (Expo Native Module)
 
-**Version 3.0 Patch 1**
+**Version 3.0.4**
 
 A powerful **Expo Native Module** for Android that leverages the `MediaSessionManager` API to listen for media playback events from *any* active media app (Spotify, YouTube, Apple Music, etc.) on the device.
 
@@ -192,7 +192,9 @@ if (current) {
 
 ## 📝 Changelog
 
-**v3.0.2** — Compatability with Expo 57.x.x, switched to @react-native-vector-icons/material-design-icons  
+**v3.0.4** — Upgraded module compatibility to latest Expo SDK 57 (`~57.0.28`), React Native `0.86.3`, and `expo-modules-core` `~57.0.22`  
+**v3.0.3** — Minor internal codebase improvement  
+**v3.0.2** — Minor internal codebase improvement  
 **v3.0.1** — Smart artwork caching, seek bar thumb, Feather icons  
 **v3.0.0** — `seekTo()`, manual time entry, draggable seek bar  
 **v2.0.0** — Artwork extraction, `getState()`  

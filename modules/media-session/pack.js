@@ -10,6 +10,13 @@ const pkg = require(path.join(__dirname, 'package.json'));
 try {
     console.log('Running npm pack...');
 
+    // Clean up any existing tarballs
+    fs.readdirSync(__dirname).forEach(file => {
+        if (file.endsWith('.tgz')) {
+            fs.unlinkSync(path.join(__dirname, file));
+        }
+    });
+
     // Run npm pack inside this directory
     execSync('npm pack', {
         cwd: __dirname,
@@ -29,12 +36,13 @@ try {
     const oldPath = path.join(__dirname, generatedFile);
     const newPath = path.join(__dirname, newName);
 
-    // Replace existing file if present
-    if (fs.existsSync(newPath)) {
-        fs.unlinkSync(newPath);
+    if (oldPath !== newPath) {
+        // Replace existing file if present
+        if (fs.existsSync(newPath)) {
+            fs.unlinkSync(newPath);
+        }
+        fs.renameSync(oldPath, newPath);
     }
-
-    fs.renameSync(oldPath, newPath);
 
     console.log(`Successfully packed to: ${newName}`);
 } catch (error) {

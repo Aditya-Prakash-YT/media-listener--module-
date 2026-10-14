@@ -2,7 +2,7 @@ apply plugin: 'com.android.library'
 apply plugin: 'org.jetbrains.kotlin.android'
 
 group = 'expo.modules.mediasession'
-version = '3.0.2'
+version = '3.0.4'
 
 android {
   namespace "expo.modules.mediasession"
