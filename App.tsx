@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
-  StyleSheet, Text, View, TouchableOpacity, Image, StatusBar,
+  StyleSheet, Text, View, TouchableOpacity, Image,
   PanResponder, Modal, TextInput, KeyboardAvoidingView, Platform,
-  useWindowDimensions, AppState, AppStateStatus
+  useWindowDimensions, AppState, AppStateStatus, StatusBar as RNStatusBar
 } from 'react-native';
-import Icon from '@react-native-vector-icons/material-design-icons'
+import { StatusBar } from 'expo-status-bar';
+import Icon from '@react-native-vector-icons/material-design-icons';
 import * as MediaSession from './modules/media-session';
 
 // ─── Color Palette ───────────────────────────────────────────
@@ -169,7 +170,7 @@ interface ProgressBarProps {
 function ProgressBar({
   displayPosition, duration, onSeekCommit, onSeekStart, onSeekEnd, onTimeTap,
 }: ProgressBarProps) {
-  const trackRef = useRef<View>(null);
+  const trackRef = useRef<any>(null);
   const trackLayoutRef = useRef({ width: 0, pageX: 0 });
   const [localPosition, setLocalPosition] = useState(displayPosition);
   const isSeekingRef = useRef(false);
@@ -189,7 +190,7 @@ function ProgressBar({
     onPanResponderGrant: (evt) => {
       isSeekingRef.current = true;
       onSeekStart();
-      trackRef.current?.measure((_x, _y, w, _h, pageX) => {
+      trackRef.current?.measure((_x: number, _y: number, w: number, _h: number, pageX: number) => {
         trackLayoutRef.current = { width: w, pageX };
         if (durationRef.current > 0) {
           const relativeX = evt.nativeEvent.pageX - pageX;
@@ -238,7 +239,7 @@ function ProgressBar({
           style={styles.progressTrack}
           ref={trackRef}
           onLayout={() => {
-            trackRef.current?.measure((_x, _y, w, _h, pageX) => {
+            trackRef.current?.measure((_x: number, _y: number, w: number, _h: number, pageX: number) => {
               trackLayoutRef.current = { width: w, pageX };
             });
           }}
@@ -381,7 +382,7 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      <StatusBar style="light" />
 
       {/* Header */}
       <View style={styles.header}>
@@ -418,7 +419,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingTop: StatusBar.currentHeight ?? 60,
+    paddingTop: RNStatusBar.currentHeight ?? 60,
   },
   header: {
     flexDirection: 'row',

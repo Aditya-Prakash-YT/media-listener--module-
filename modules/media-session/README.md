@@ -1,10 +1,11 @@
-# 🎵 Media Session (Expo Native Module)
+# 🎵 Expo Android Media Session Listener (`expo-android-media-session-listener`)
 
-**Version 3.0.4**
+**Version 3.0.5**
 
-A powerful **Expo Native Module** for Android that leverages the `MediaSessionManager` API to listen for media playback events from *any* active media app (Spotify, YouTube, Apple Music, etc.) on the device.
+A powerful **Expo Native Module** for Android that leverages the `MediaSessionManager` API to listen for media playback events from *any* active media app (Spotify, YouTube, Apple Music, SoundCloud, Samsung Music, etc.) on the device and control playback.
 
-> **Platform**: Android only (API 24+)
+> **Platform**: Android only (API 24+)  
+> **Expo SDK**: Supports Expo SDK 58+ and backward compatible with Expo SDK 50+
 
 ---
 
@@ -21,7 +22,27 @@ A powerful **Expo Native Module** for Android that leverages the `MediaSessionMa
 
 ## 📦 Installation
 
-### Option 1: Local Module (Development)
+### Option 1: Install from Tarball (.tgz)
+
+```bash
+# In your Expo / React Native project root:
+npm install ./path/to/expo-android-media-session-listener-3.0.5.tgz
+
+# Prebuild and run Android
+npx expo prebuild --platform android
+npx expo run:android
+```
+
+### Option 2: Install from NPM Registry
+
+```bash
+npm install expo-android-media-session-listener
+
+npx expo prebuild --platform android
+npx expo run:android
+```
+
+### Option 3: Local Module (Development)
 
 If using as a local module in `modules/media-session`:
 
@@ -31,26 +52,28 @@ npx expo prebuild --platform android
 npx expo run:android
 ```
 
-### Option 2: NPM Tarball
+---
+
+## 🔨 Building the Package (.tgz)
+
+To package the module into an installable `.tgz` tarball:
 
 ```bash
-# Generate timestamped tarball
 cd modules/media-session
-npm run pack-time
-
-# Install in your project
-npm install ./path/to/media-session-*.tgz
-npx expo run:android
+npm run build
+# or: npm run pack-time
 ```
+
+This will automatically create `expo-android-media-session-listener-3.0.5.tgz` in the directory, ready to install into any Expo/React Native project.
 
 ---
 
 ## 🔒 Permissions
 
-This module requires **Notification Listener** permission.
+This module requires **Notification Listener** permission to access active media sessions.
 
 ```typescript
-import * as MediaSession from 'media-session';
+import * as MediaSession from 'expo-android-media-session-listener';
 
 // Check permission
 if (!MediaSession.hasPermission()) {
@@ -63,23 +86,23 @@ if (!MediaSession.hasPermission()) {
 ## 🚀 Quick Start
 
 ```typescript
-import * as MediaSession from 'media-session';
+import * as MediaSession from 'expo-android-media-session-listener';
 
-// Subscribe to media events
+// 1. Subscribe to media events
 const subscription = MediaSession.addMediaListener((event) => {
   console.log(`${event.title} by ${event.artist}`);
   console.log(`State: ${event.state}`);
   console.log(`Position: ${event.position}/${event.duration} ms`);
 });
 
-// Control playback
+// 2. Control playback
 MediaSession.play();
 MediaSession.pause();
 MediaSession.skipNext();
 MediaSession.skipPrevious();
 MediaSession.seekTo(30000); // 30 seconds
 
-// Cleanup
+// 3. Cleanup when done
 subscription.remove();
 ```
 
@@ -92,7 +115,7 @@ subscription.remove();
 ```typescript
 import { useEffect, useState } from 'react';
 import { Text, View, Image } from 'react-native';
-import * as MediaSession from 'media-session';
+import * as MediaSession from 'expo-android-media-session-listener';
 
 export default function NowPlaying() {
   const [media, setMedia] = useState<MediaSession.MediaEvent | null>(null);
@@ -124,6 +147,8 @@ export default function NowPlaying() {
 ### Seeking to Custom Time
 
 ```typescript
+import * as MediaSession from 'expo-android-media-session-listener';
+
 // Seek to 2 minutes
 MediaSession.seekTo(120000);
 
@@ -138,6 +163,8 @@ MediaSession.seekTo(Math.max(0, current - 10000));
 ### Synchronous State
 
 ```typescript
+import * as MediaSession from 'expo-android-media-session-listener';
+
 // Get current state immediately (useful on mount)
 const current = MediaSession.getState();
 if (current) {
@@ -192,7 +219,8 @@ if (current) {
 
 ## 📝 Changelog
 
-**v3.0.4** — Upgraded module compatibility to latest Expo SDK 57 (`~57.0.28`), React Native `0.86.3`, and `expo-modules-core` `~57.0.22`  
+**v3.0.5** — Upgraded module compatibility to latest Expo SDK 58 (`~58.0.14`), React Native `0.88.0`, React `19.3.0`, and `expo-modules-core` `~58.0.22`. Officially renamed module to `expo-android-media-session-listener`. Updated packaging build script to generate `expo-android-media-session-listener-3.0.5.tgz` with optimized file whitelist.  
+**v3.0.4** — Upgraded module compatibility to Expo SDK 57 (`~57.0.28`), React Native `0.86.3`, and `expo-modules-core` `~57.0.22`  
 **v3.0.3** — Minor internal codebase improvement  
 **v3.0.2** — Minor internal codebase improvement  
 **v3.0.1** — Smart artwork caching, seek bar thumb, Feather icons  

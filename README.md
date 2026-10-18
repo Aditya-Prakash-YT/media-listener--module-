@@ -1,6 +1,6 @@
-# 🎵 Media Session Listener
+# 🎵 Expo Android Media Session Listener
 
-**Version 3.0.4**
+**Version 3.0.5** (`expo-android-media-session-listener`)
 
 A powerful **Expo Native Module** for Android that leverages the `MediaSessionManager` API to listen for media playback events from *any* active media app (Spotify, YouTube, Apple Music, etc.) on the device.
 
@@ -45,34 +45,59 @@ A powerful **Expo Native Module** for Android that leverages the `MediaSessionMa
 
 ---
 
-## 📦 Installation
+## 📦 Installation & Usage
 
-### 1. Clone or Copy the Module
+### Installing as a Dependency in Your Project
 
-```bash
-# Clone this repository
-git clone https://github.com/your-username/media-listener-app.git
-cd media-listener-app
-
-# Install dependencies
-npm install
-```
-
-### 2. Configure Native Project
-
-Since this is a native module, you must prebuild your Expo project to generate the Android folder:
+To use this module in any Expo or React Native project:
 
 ```bash
+# Option A: Install from the generated tarball (.tgz)
+npm install ./path/to/expo-android-media-session-listener-3.0.5.tgz
+
+# Option B: Install from NPM (when published)
+npm install expo-android-media-session-listener
+
+# Generate native Android directories (custom dev client required)
 npx expo prebuild --platform android
-```
-
-### 3. Run the App
-
-```bash
 npx expo run:android
 ```
 
-> **Note**: You cannot use Expo Go for this module. It requires a custom development build.
+> **Note**: This module requires a custom development build (Expo Prebuild / CNG). Expo Go does not support custom Android Notification Listener services.
+
+---
+
+### Running This Example App (Development)
+
+```bash
+# 1. Clone repository
+git clone https://github.com/Aditya-Prakash-YT/media-listener--module-.git
+cd media-listener--module-
+
+# 2. Install dependencies (Expo SDK 58, React Native 0.88.0)
+npm install
+
+# 3. Prebuild & run on Android device/emulator
+npx expo prebuild --platform android
+npx expo run:android
+```
+
+---
+
+### 🔨 Building the Module Tarball (.tgz)
+
+You can package the module into a standalone, clean `.tgz` file at any time:
+
+```bash
+# From project root:
+npm run build:module
+
+# Or directly within the module directory:
+cd modules/media-session
+npm run build
+```
+
+This creates `modules/media-session/expo-android-media-session-listener-3.0.5.tgz`, ready to distribute or install in other apps.
 
 ---
 
@@ -113,8 +138,10 @@ function usePermissionCheck() {
 
 ## 🚀 Quick Start
 
-```typescript
-import * as MediaSession from './modules/media-session';
+// If installed as a package/tarball:
+import * as MediaSession from 'expo-android-media-session-listener';
+// Or if using the local source folder:
+// import * as MediaSession from './modules/media-session';
 
 // 1. Check permission
 if (!MediaSession.hasPermission()) {
@@ -585,6 +612,11 @@ MediaSession.seekTo(120000);
 ---
 
 ## 📝 Changelog
+
+### v3.0.5
+- **Updated**: Upgraded module dependencies to latest Expo SDK 58 (`~58.0.14`), React Native `0.88.0`, React `19.3.0`, and `expo-modules-core` `~58.0.22`.
+- **Renamed**: Renamed module to `expo-android-media-session-listener`.
+- **Packaging**: Updated build and packing script `pack.js` to build `expo-android-media-session-listener-3.0.5.tgz` with clean distribution files.
 
 ### v3.0.4
 - **Updated**: Upgraded Expo to latest SDK 57 (`^57.0.28`).

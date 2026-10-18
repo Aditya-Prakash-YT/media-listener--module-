@@ -1,22 +1,100 @@
 {
-  "name": "media-session",
-  "version": "3.0.4",
+  "name": "expo-android-media-session-listener",
+  "version": "3.0.5",
+  "description": "Android-only Expo native module for listening to active media sessions, reading track metadata and album artwork, tracking playback state, and controlling music playback across apps.",
+  "keywords": [
+    "expo",
+    "expo-module",
+    "expo-modules",
+    "expo-native-module",
+    "expo-development-build",
+    "expo-prebuild",
+    "react-native",
+    "react-native-module",
+    "custom-native-module",
+    "android",
+    "android-native-module",
+    "native-android",
+    "android-media-session",
+    "android-media-session-listener",
+    "media-session",
+    "media-session-manager",
+    "media-session-listener",
+    "media-listener",
+    "active-media-session",
+    "notification-listener",
+    "notification-listener-service",
+    "notification-access",
+    "android-notification-access",
+    "media-playback",
+    "playback-state",
+    "playback-controls",
+    "media-controls",
+    "music-controls",
+    "audio-controls",
+    "music-metadata",
+    "media-metadata",
+    "track-metadata",
+    "now-playing",
+    "current-track",
+    "album-artwork",
+    "album-art",
+    "artwork-extraction",
+    "seek",
+    "seek-to",
+    "seekbar",
+    "skip-track",
+    "play-pause",
+    "spotify",
+    "youtube",
+    "soundcloud",
+    "apple-music",
+    "samsung-music",
+    "typescript",
+    "kotlin",
+    "android-audio",
+    "music-player"
+  ],
+  "homepage": "https://github.com/Aditya-Prakash-YT/media-listener--module-#readme",
+  "bugs": {
+    "url": "https://github.com/Aditya-Prakash-YT/media-listener--module-/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aditya-Prakash-YT/media-listener--module-.git"
+  },
+  "license": "MIT",
+  "author": "aditya8prakash",
+  "type": "commonjs",
   "main": "index.ts",
   "types": "index.ts",
+  "files": [
+    "index.ts",
+    "expo-module.config.json",
+    "app.json",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+  ],
   "scripts": {
+    "build": "node pack.js",
     "pack-time": "node pack.js"
   },
-  "dependencies": {
-    "expo": "~57.0.28",
-    "react": "19.2.3",
-    "react-native": "0.86.3"
+  "dependencies": {},
+  "devDependencies": {
+    "expo": "~58.0.14",
+    "react": "19.3.0",
+    "react-native": "0.88.0",
+    "expo-modules-core": "~58.0.22"
   },
   "peerDependencies": {
     "expo": "*",
     "react": "*",
     "react-native": "*"
   },
-  "devDependencies": {
-    "expo-modules-core": "~57.0.22"
+  "peerDependenciesMeta": {
+    "expo": {
+      "optional": true
+    }
   }
 }

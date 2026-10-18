@@ -30,8 +30,8 @@ try {
         throw new Error(`Could not find generated file: ${generatedFile}`);
     }
 
-    // Always rename to media-session-<version>.tgz
-    const newName = `media-session-${pkg.version}.tgz`;
+    // Target package filename: expo-android-media-session-listener-<version>.tgz
+    const newName = `expo-android-media-session-listener-${pkg.version}.tgz`;
 
     const oldPath = path.join(__dirname, generatedFile);
     const newPath = path.join(__dirname, newName);
