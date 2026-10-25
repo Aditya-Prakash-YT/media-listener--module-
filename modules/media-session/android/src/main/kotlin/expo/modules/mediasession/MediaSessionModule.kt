@@ -2,6 +2,7 @@ package expo.modules.mediasession
 
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import android.content.ComponentName
 import android.content.Intent
 import android.provider.Settings
 import android.os.Bundle
@@ -27,7 +28,15 @@ class MediaSessionModule : Module() {
         Function("hasPermission") {
             val packageName = context.packageName
             val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
-            return@Function flat != null && flat.contains(packageName)
+                ?: return@Function false
+            val names = flat.split(":")
+            for (name in names) {
+                val component = ComponentName.unflattenFromString(name)
+                if (component != null && component.packageName == packageName) {
+                    return@Function true
+                }
+            }
+            return@Function false
         }
 
         Function("play") {
@@ -94,6 +103,10 @@ class MediaSessionModule : Module() {
             MediaEventManager.setListener { bundle ->
                 sendEvent("onMediaChanged", bundleToMap(bundle))
             }
+        }
+
+        OnStopObserving {
+            MediaEventManager.setListener(null)
         }
     }
 

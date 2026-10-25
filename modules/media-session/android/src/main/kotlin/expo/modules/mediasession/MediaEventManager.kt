@@ -1,15 +1,16 @@
 package expo.modules.mediasession
 
 import android.os.Bundle
+import java.util.concurrent.atomic.AtomicReference
 
 object MediaEventManager {
-    private var listener: ((Bundle) -> Unit)? = null
+    private val listenerRef = AtomicReference<((Bundle) -> Unit)?>()
 
-    fun setListener(callback: (Bundle) -> Unit) {
-        listener = callback
+    fun setListener(callback: ((Bundle) -> Unit)?) {
+        listenerRef.set(callback)
     }
 
     fun emitEvent(data: Bundle) {
-        listener?.invoke(data)
+        listenerRef.get()?.invoke(data)
     }
 }

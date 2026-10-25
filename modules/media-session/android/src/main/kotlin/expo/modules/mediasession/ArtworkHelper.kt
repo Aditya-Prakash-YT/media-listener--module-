@@ -12,9 +12,17 @@ import java.io.File
  */
 object ArtworkHelper {
     private const val TAG = "ArtworkHelper"
+    private const val MAX_ARTWORK_DIMENSION = 512
+    private const val MAX_CACHE_ENTRIES = 30
 
     private data class ArtCache(val signature: String, val timestamp: Long)
-    private val artworkCache = mutableMapOf<String, ArtCache>()
+
+    // Thread-safe bounded LRU cache to prevent unbounded memory growth
+    private val artworkCache = object : LinkedHashMap<String, ArtCache>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ArtCache>?): Boolean {
+            return size > MAX_CACHE_ENTRIES
+        }
+    }
 
     /**
      * Resolve artwork URI for a media controller.
@@ -30,31 +38,65 @@ object ArtworkHelper {
         val album = metadata.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: ""
         val signature = "$title|$album"
 
+        val rawPkg = controller.packageName ?: "unknown"
+        val safePkgName = rawPkg.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
+
+        val targetFile = File(cacheDir, "album_art_$safePkgName.jpg")
+
+        // Canonical path validation against directory traversal
+        try {
+            if (!targetFile.canonicalPath.startsWith(cacheDir.canonicalPath)) {
+                Log.w(TAG, "Path traversal attempt blocked for package: $rawPkg")
+                return null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to validate canonical path for package: $rawPkg", e)
+            return null
+        }
+
         try {
             // Try bitmap first (most local players embed it)
-            val bitmap = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+            val rawBitmap = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
                 ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_ART)
 
-            if (bitmap != null) {
+            if (rawBitmap != null) {
+                var scaledBitmap: Bitmap? = null
                 try {
-                    val cache = artworkCache[controller.packageName]
-                    val ts: Long
-
-                    if (cache != null && cache.signature == signature) {
-                        ts = cache.timestamp
-                    } else {
-                        ts = System.currentTimeMillis()
-                        val file = File(cacheDir, "album_art_${controller.packageName}.jpg")
-                        file.outputStream().use { stream ->
-                            bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+                    // Downscale large bitmaps to prevent OOM and reduce compression time
+                    val bitmap = if (rawBitmap.width > MAX_ARTWORK_DIMENSION || rawBitmap.height > MAX_ARTWORK_DIMENSION) {
+                        val ratio = minOf(
+                            MAX_ARTWORK_DIMENSION.toFloat() / rawBitmap.width,
+                            MAX_ARTWORK_DIMENSION.toFloat() / rawBitmap.height
+                        )
+                        val scaledWidth = (rawBitmap.width * ratio).toInt().coerceAtLeast(1)
+                        val scaledHeight = (rawBitmap.height * ratio).toInt().coerceAtLeast(1)
+                        val scaled = Bitmap.createScaledBitmap(rawBitmap, scaledWidth, scaledHeight, true)
+                        if (scaled != rawBitmap) {
+                            scaledBitmap = scaled
                         }
-                        artworkCache[controller.packageName] = ArtCache(signature, ts)
+                        scaled
+                    } else {
+                        rawBitmap
                     }
 
-                    val file = File(cacheDir, "album_art_${controller.packageName}.jpg")
-                    return "file://${file.absolutePath}?ts=$ts"
+                    val ts: Long
+                    synchronized(artworkCache) {
+                        val cache = artworkCache[safePkgName]
+                        if (cache != null && cache.signature == signature && targetFile.exists()) {
+                            ts = cache.timestamp
+                        } else {
+                            ts = System.currentTimeMillis()
+                            targetFile.outputStream().use { stream ->
+                                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+                            }
+                            artworkCache[safePkgName] = ArtCache(signature, ts)
+                        }
+                    }
+
+                    return "file://${targetFile.absolutePath}?ts=$ts"
                 } finally {
-                    bitmap.recycle()
+                    scaledBitmap?.recycle()
+                    rawBitmap.recycle()
                 }
             }
 
@@ -62,16 +104,19 @@ object ArtworkHelper {
             val artUriStr = metadata.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI)
                 ?: metadata.getString(MediaMetadata.METADATA_KEY_ART_URI)
 
-            if (artUriStr != null) {
-                val cache = artworkCache[controller.packageName]
+            if (!artUriStr.isNullOrBlank()) {
                 val ts: Long
-                if (cache != null && cache.signature == signature) {
-                    ts = cache.timestamp
-                } else {
-                    ts = System.currentTimeMillis()
-                    artworkCache[controller.packageName] = ArtCache(signature, ts)
+                synchronized(artworkCache) {
+                    val cache = artworkCache[safePkgName]
+                    if (cache != null && cache.signature == signature) {
+                        ts = cache.timestamp
+                    } else {
+                        ts = System.currentTimeMillis()
+                        artworkCache[safePkgName] = ArtCache(signature, ts)
+                    }
                 }
-                return "$artUriStr?ts=$ts"
+                val separator = if (artUriStr.contains("?")) "&" else "?"
+                return "$artUriStr${separator}ts=$ts"
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error resolving artwork for ${controller.packageName}", e)

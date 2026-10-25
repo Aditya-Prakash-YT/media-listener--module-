@@ -748,7 +748,7 @@ To pack the standalone module into a local `.tgz` archive:
 
 ```bash
 npm run build:module
-# Generated in modules/media-session/expo-android-media-session-listener-3.0.6.tgz
+# Generated in modules/media-session/expo-android-media-session-listener-3.0.7.tgz
 ```
 
 ---
@@ -756,6 +756,14 @@ npm run build:module
 ## 📝 Changelog
 
 See the full history in [GitHub Releases](https://github.com/Aditya-Prakash-YT/media-listener--module-/releases).
+
+### v3.0.7
+- **Security Hardening (Permissions)**: Fixed `hasPermission()` false-positive vulnerability by replacing raw substring checking with exact `ComponentName` package verification.
+- **Security Hardening (Path Traversal)**: Sanitized package names and enforced strict canonical path validation within `ArtworkHelper` to eliminate arbitrary file write / path traversal risks.
+- **Stability & Performance (ANR/OOM Prevention)**: Added automatic aspect-ratio downscaling for oversized album art bitmaps (>512px) with explicit bitmap memory recycling to prevent UI thread freezes and Out-Of-Memory crashes.
+- **Concurrency & Thread Safety**: Wrapped `MediaEventManager` callbacks in `AtomicReference` to prevent multi-threaded race conditions between Android binder and React Native threads.
+- **Lifecycle Optimization**: Implemented `OnStopObserving` to unsubscribe native listeners when all JavaScript subscribers unmount, eliminating background battery and CPU drain.
+- **Memory Management**: Added stale `activeController` cleanup when source sessions disconnect, and introduced a bounded LRU memory cache for artwork metadata.
 
 ### v3.0.6
 - **Published to npm**: Officially available on npm as `expo-android-media-session-listener`.

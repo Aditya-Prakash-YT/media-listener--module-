@@ -1,6 +1,6 @@
 {
   "name": "expo-android-media-session-listener",
-  "version": "3.0.6",
+  "version": "3.0.7",
   "description": "Android-only Expo native module for listening to active media sessions, reading track metadata and album artwork, tracking playback state, and controlling music playback across apps.",
   "keywords": [
     "expo",

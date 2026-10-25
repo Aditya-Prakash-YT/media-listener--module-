@@ -63,6 +63,11 @@ class MediaSessionService : NotificationListenerService() {
         
         val currentPackages = controllers?.map { it.packageName }?.toSet() ?: emptySet()
         val registeredPackages = controllerCallbacks.keys.map { it.packageName }.toSet()
+
+        // Clear activeController if its package is no longer active to prevent stale references
+        if (activeController != null && activeController?.packageName !in currentPackages) {
+            activeController = null
+        }
         
         // Safe removal — snapshot keys first to avoid ConcurrentModificationException
         val toRemove = controllerCallbacks.keys.filter { it.packageName !in currentPackages }

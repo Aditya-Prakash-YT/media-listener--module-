@@ -347,6 +347,22 @@ export interface MediaEvent {
 
 ---
 
+## 📝 Changelog
+
+### v3.0.7
+- **Security Hardening (Permissions)**: Fixed `hasPermission()` false-positive vulnerability by replacing raw substring checking with exact `ComponentName` package verification.
+- **Security Hardening (Path Traversal)**: Sanitized package names and enforced strict canonical path validation within `ArtworkHelper` to eliminate arbitrary file write / path traversal risks.
+- **Stability & Performance (ANR/OOM Prevention)**: Added automatic aspect-ratio downscaling for oversized album art bitmaps (>512px) with explicit bitmap memory recycling to prevent UI thread freezes and Out-Of-Memory crashes.
+- **Concurrency & Thread Safety**: Wrapped `MediaEventManager` callbacks in `AtomicReference` to prevent multi-threaded race conditions between Android binder and React Native threads.
+- **Lifecycle Optimization**: Implemented `OnStopObserving` to unsubscribe native listeners when all JavaScript subscribers unmount, eliminating background battery and CPU drain.
+- **Memory Management**: Added stale `activeController` cleanup when source sessions disconnect, and introduced a bounded LRU memory cache for artwork metadata.
+
+### v3.0.6
+- **Published to npm**: Officially available on npm as `expo-android-media-session-listener`.
+- **Expo SDK 58**: Fully compatible with Expo SDK 58, React Native `0.88.0`, React `19.3.0`, and `expo-modules-core` `~58.0.26`.
+
+---
+
 ## 📄 License
 
 MIT © [aditya8prakash](https://github.com/Aditya-Prakash-YT)
