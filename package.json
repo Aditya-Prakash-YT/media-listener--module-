@@ -1,6 +1,6 @@
 {
   "name": "media-session-app",
-  "version": "3.0.5",
+  "version": "3.0.6",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -12,17 +12,17 @@
   },
   "dependencies": {
     "@react-native-vector-icons/material-design-icons": "^13.1.5",
-    "expo": "~58.0.14",
-    "expo-font": "~58.0.8",
-    "expo-splash-screen": "~58.0.10",
-    "expo-status-bar": "~58.0.3",
+    "expo": "~58.0.19",
     "expo-android-media-session-listener": "file:modules/media-session",
+    "expo-font": "~58.0.10",
+    "expo-splash-screen": "~58.0.11",
+    "expo-status-bar": "~58.0.4",
     "react": "19.3.0",
     "react-native": "0.88.0"
   },
   "devDependencies": {
     "@types/react": "~19.3.0",
-    "babel-preset-expo": "~58.0.17",
+    "babel-preset-expo": "~58.0.20",
     "typescript": "~6.0.3"
   },
   "private": true

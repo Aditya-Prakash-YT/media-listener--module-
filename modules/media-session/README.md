@@ -1,6 +1,6 @@
 # 🎵 Expo Android Media Session Listener (`expo-android-media-session-listener`)
 
-**Version 3.0.5**
+**Version 3.0.6**
 
 A powerful **Expo Native Module** for Android that leverages the `MediaSessionManager` API to listen for media playback events from *any* active media app (Spotify, YouTube, Apple Music, SoundCloud, Samsung Music, etc.) on the device and control playback.
 
@@ -26,7 +26,7 @@ A powerful **Expo Native Module** for Android that leverages the `MediaSessionMa
 
 ```bash
 # In your Expo / React Native project root:
-npm install ./path/to/expo-android-media-session-listener-3.0.5.tgz
+npm install ./path/to/expo-android-media-session-listener-3.0.6.tgz
 
 # Prebuild and run Android
 npx expo prebuild --platform android
@@ -64,7 +64,7 @@ npm run build
 # or: npm run pack-time
 ```
 
-This will automatically create `expo-android-media-session-listener-3.0.5.tgz` in the directory, ready to install into any Expo/React Native project.
+This will automatically create `expo-android-media-session-listener-3.0.6.tgz` in the directory, ready to install into any Expo/React Native project.
 
 ---
 
@@ -219,7 +219,8 @@ if (current) {
 
 ## 📝 Changelog
 
-**v3.0.5** — Upgraded module compatibility to latest Expo SDK 58 (`~58.0.14`), React Native `0.88.0`, React `19.3.0`, and `expo-modules-core` `~58.0.22`. Officially renamed module to `expo-android-media-session-listener`. Updated packaging build script to generate `expo-android-media-session-listener-3.0.5.tgz` with optimized file whitelist.  
+**v3.0.6** — Bumped version to 3.0.6. Updated all Expo SDK 58 dependencies (`expo` `~58.0.19`, `expo-modules-core` `~58.0.26`, `expo-font` `~58.0.10`, `expo-splash-screen` `~58.0.11`, `expo-status-bar` `~58.0.4`, `babel-preset-expo` `~58.0.20`).  
+**v3.0.5** — Upgraded module compatibility to latest Expo SDK 58, React Native `0.88.0`, React `19.3.0`, and `expo-modules-core`. Officially renamed module to `expo-android-media-session-listener`. Updated packaging build script to generate `expo-android-media-session-listener-3.0.5.tgz` with optimized file whitelist.  
 **v3.0.4** — Upgraded module compatibility to Expo SDK 57 (`~57.0.28`), React Native `0.86.3`, and `expo-modules-core` `~57.0.22`  
 **v3.0.3** — Minor internal codebase improvement  
 **v3.0.2** — Minor internal codebase improvement  

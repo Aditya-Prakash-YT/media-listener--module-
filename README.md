@@ -1,6 +1,6 @@
 # 🎵 Expo Android Media Session Listener
 
-**Version 3.0.5** (`expo-android-media-session-listener`)
+**Version 3.0.6** (`expo-android-media-session-listener`)
 
 A powerful **Expo Native Module** for Android that leverages the `MediaSessionManager` API to listen for media playback events from *any* active media app (Spotify, YouTube, Apple Music, etc.) on the device.
 
@@ -53,7 +53,7 @@ To use this module in any Expo or React Native project:
 
 ```bash
 # Option A: Install from the generated tarball (.tgz)
-npm install ./path/to/expo-android-media-session-listener-3.0.5.tgz
+npm install ./path/to/expo-android-media-session-listener-3.0.6.tgz
 
 # Option B: Install from NPM (when published)
 npm install expo-android-media-session-listener
@@ -97,7 +97,7 @@ cd modules/media-session
 npm run build
 ```
 
-This creates `modules/media-session/expo-android-media-session-listener-3.0.5.tgz`, ready to distribute or install in other apps.
+This creates `modules/media-session/expo-android-media-session-listener-3.0.6.tgz`, ready to distribute or install in other apps.
 
 ---
 
@@ -613,8 +613,13 @@ MediaSession.seekTo(120000);
 
 ## 📝 Changelog
 
+### v3.0.6
+- **Version**: Bumped version to `3.0.6`.
+- **Dependencies**: Upgraded to latest Expo SDK 58 releases (`expo` `~58.0.19`, `expo-modules-core` `~58.0.26`, `expo-font` `~58.0.10`, `expo-splash-screen` `~58.0.11`, `expo-status-bar` `~58.0.4`, `babel-preset-expo` `~58.0.20`).
+- **Packaging**: Updated build and packing script to generate `expo-android-media-session-listener-3.0.6.tgz`.
+
 ### v3.0.5
-- **Updated**: Upgraded module dependencies to latest Expo SDK 58 (`~58.0.14`), React Native `0.88.0`, React `19.3.0`, and `expo-modules-core` `~58.0.22`.
+- **Updated**: Upgraded module dependencies to Expo SDK 58, React Native `0.88.0`, React `19.3.0`, and `expo-modules-core`.
 - **Renamed**: Renamed module to `expo-android-media-session-listener`.
 - **Packaging**: Updated build and packing script `pack.js` to build `expo-android-media-session-listener-3.0.5.tgz` with clean distribution files.
 
