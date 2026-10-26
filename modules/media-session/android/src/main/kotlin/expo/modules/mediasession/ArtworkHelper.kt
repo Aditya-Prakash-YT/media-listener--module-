@@ -39,13 +39,17 @@ object ArtworkHelper {
         val signature = "$title|$album"
 
         val rawPkg = controller.packageName ?: "unknown"
-        val safePkgName = rawPkg.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
+        // Strict alphanumeric + underscores/dots, strip path separators or traversal characters
+        val safePkgName = rawPkg.filter { it.isLetterOrDigit() || it == '.' || it == '_' }.ifEmpty { "unknown" }
 
         val targetFile = File(cacheDir, "album_art_$safePkgName.jpg")
 
-        // Canonical path validation against directory traversal
+        // Strict canonical path boundary check against directory traversal (API 24+ compatible)
         try {
-            if (!targetFile.canonicalPath.startsWith(cacheDir.canonicalPath)) {
+            val cacheCanonical = cacheDir.canonicalPath
+            val targetCanonical = targetFile.canonicalPath
+            val cachePrefix = if (cacheCanonical.endsWith(File.separator)) cacheCanonical else cacheCanonical + File.separator
+            if (!targetCanonical.startsWith(cachePrefix)) {
                 Log.w(TAG, "Path traversal attempt blocked for package: $rawPkg")
                 return null
             }
@@ -86,8 +90,22 @@ object ArtworkHelper {
                             ts = cache.timestamp
                         } else {
                             ts = System.currentTimeMillis()
-                            targetFile.outputStream().use { stream ->
-                                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+                            // Atomic write via temp file to avoid leaving corrupt/partial files
+                            val tempFile = File(cacheDir, "temp_art_${safePkgName}_${ts}.tmp")
+                            try {
+                                tempFile.outputStream().use { stream ->
+                                    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+                                }
+                                if (targetFile.exists()) {
+                                    targetFile.delete()
+                                }
+                                if (!tempFile.renameTo(targetFile)) {
+                                    tempFile.copyTo(targetFile, overwrite = true)
+                                    tempFile.delete()
+                                }
+                            } catch (writeEx: Exception) {
+                                tempFile.delete()
+                                throw writeEx
                             }
                             artworkCache[safePkgName] = ArtCache(signature, ts)
                         }
@@ -95,8 +113,9 @@ object ArtworkHelper {
 
                     return "file://${targetFile.absolutePath}?ts=$ts"
                 } finally {
+                    // Recycle ONLY locally allocated scaledBitmap.
+                    // DO NOT call rawBitmap.recycle() - rawBitmap belongs to MediaMetadata system parcel!
                     scaledBitmap?.recycle()
-                    rawBitmap.recycle()
                 }
             }
 
@@ -105,18 +124,25 @@ object ArtworkHelper {
                 ?: metadata.getString(MediaMetadata.METADATA_KEY_ART_URI)
 
             if (!artUriStr.isNullOrBlank()) {
-                val ts: Long
-                synchronized(artworkCache) {
-                    val cache = artworkCache[safePkgName]
-                    if (cache != null && cache.signature == signature) {
-                        ts = cache.timestamp
-                    } else {
-                        ts = System.currentTimeMillis()
-                        artworkCache[safePkgName] = ArtCache(signature, ts)
+                // Validate URI scheme to block arbitrary or dangerous schemes
+                val parsedUri = android.net.Uri.parse(artUriStr)
+                val scheme = parsedUri.scheme?.lowercase()
+                if (scheme == "https" || scheme == "http" || scheme == "content" || scheme == "file") {
+                    val ts: Long
+                    synchronized(artworkCache) {
+                        val cache = artworkCache[safePkgName]
+                        if (cache != null && cache.signature == signature) {
+                            ts = cache.timestamp
+                        } else {
+                            ts = System.currentTimeMillis()
+                            artworkCache[safePkgName] = ArtCache(signature, ts)
+                        }
                     }
+                    val separator = if (artUriStr.contains("?")) "&" else "?"
+                    return "$artUriStr${separator}ts=$ts"
+                } else {
+                    Log.w(TAG, "Rejected untrusted artwork URI scheme '$scheme' for package $rawPkg")
                 }
-                val separator = if (artUriStr.contains("?")) "&" else "?"
-                return "$artUriStr${separator}ts=$ts"
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error resolving artwork for ${controller.packageName}", e)

@@ -20,43 +20,66 @@ class MediaSessionModule : Module() {
         Events("onMediaChanged")
 
         Function("requestPermission") {
-            val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
+            try {
+                val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                if (intent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(intent)
+                } else {
+                    Log.w(TAG, "Notification listener settings activity not found on device")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start notification listener settings", e)
+            }
         }
 
         Function("hasPermission") {
             val packageName = context.packageName
-            val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
-                ?: return@Function false
-            val names = flat.split(":")
-            for (name in names) {
-                val component = ComponentName.unflattenFromString(name)
-                if (component != null && component.packageName == packageName) {
+            try {
+                val enabledPackages = androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(context)
+                if (enabledPackages.contains(packageName)) {
                     return@Function true
                 }
+            } catch (_: Throwable) {
+                // Fallback to Settings.Secure below
+            }
+
+            try {
+                val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+                    ?: return@Function false
+                val names = flat.split(":")
+                for (name in names) {
+                    val component = ComponentName.unflattenFromString(name)
+                    if (component != null && component.packageName == packageName) {
+                        return@Function true
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error checking enabled_notification_listeners", e)
             }
             return@Function false
         }
 
         Function("play") {
-            MediaSessionService.activeController?.transportControls?.play()
+            safeTransportAction { it.play() }
         }
 
         Function("pause") {
-            MediaSessionService.activeController?.transportControls?.pause()
+            safeTransportAction { it.pause() }
         }
 
         Function("skipNext") {
-            MediaSessionService.activeController?.transportControls?.skipToNext()
+            safeTransportAction { it.skipToNext() }
         }
 
         Function("skipPrevious") {
-            MediaSessionService.activeController?.transportControls?.skipToPrevious()
+            safeTransportAction { it.skipToPrevious() }
         }
 
         Function("seekTo") { position: Long ->
-            MediaSessionService.activeController?.transportControls?.seekTo(position)
+            if (position >= 0) {
+                safeTransportAction { it.seekTo(position) }
+            }
         }
 
         Function("getState") {
@@ -82,10 +105,13 @@ class MediaSessionModule : Module() {
                 null
             }
             
+            val artistStr = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST)
+                ?: metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST) ?: ""
+
             val result = mutableMapOf<String, Any?>(
                 "package" to controller.packageName,
                 "title" to (metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: ""),
-                "artist" to (metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST) ?: ""),
+                "artist" to artistStr,
                 "album" to (metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM) ?: ""),
                 "state" to stateString,
                 "position" to (state?.position ?: 0L),
@@ -107,6 +133,22 @@ class MediaSessionModule : Module() {
 
         OnStopObserving {
             MediaEventManager.setListener(null)
+        }
+    }
+
+    private fun safeTransportAction(action: (android.media.session.MediaController.TransportControls) -> Unit) {
+        try {
+            val controller = MediaSessionService.activeController
+            val controls = controller?.transportControls
+            if (controls != null) {
+                action(controls)
+            }
+        } catch (e: android.os.DeadObjectException) {
+            Log.w(TAG, "MediaController is dead or process terminated", e)
+        } catch (e: SecurityException) {
+            Log.w(TAG, "SecurityException calling transport control", e)
+        } catch (e: Exception) {
+            Log.e(TAG, "Unexpected error calling transport control", e)
         }
     }
 

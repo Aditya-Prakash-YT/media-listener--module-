@@ -349,6 +349,18 @@ export interface MediaEvent {
 
 ## 📝 Changelog
 
+### v3.0.8
+- **Security Audit & Path Traversal Fix**: Upgraded canonical path boundary validation in `ArtworkHelper` using trailing directory delimiter checks fully compatible with Android API 24+.
+- **Atomic File Writing**: Artwork is written to `.tmp` files and atomically renamed to prevent file corruption or race conditions.
+- **Memory Safety & Native Crash Prevention**: Removed unsafe manual `.recycle()` calls on foreign `MediaMetadata` bitmaps, eliminating native canvas recycling crashes.
+- **Asynchronous Execution & ANR Elimination**: Moved bitmap extraction, scaling, and disk I/O off the main UI thread to a background executor in `MediaSessionService`, preventing UI stutter and Android ANR dialogs.
+- **IPC & Binder Exception Safety**: Wrapped playback controls (`play`, `pause`, `skipNext`, `skipPrevious`, `seekTo`) in safe exception blocks handling `DeadObjectException`, `SecurityException`, and `RemoteException`.
+- **Safe Intent Resolution**: Added package manager capability checks before starting notification listener settings to prevent `ActivityNotFoundException`.
+- **Modern Notification Check**: Added `NotificationManagerCompat.getEnabledListenerPackages` detection with fallback to `Settings.Secure`.
+- **Manifest & Permission Hardening**: Removed `SYSTEM_ALERT_WINDOW` and unneeded legacy storage permissions from production manifest; disabled insecure `allowBackup`.
+- **Release Signing Security**: Configured standalone `signingConfigs.release` supporting external keystore properties instead of hardcoded debug keys.
+- **Privacy & Compliance**: Added in-app prominent privacy disclosure in `App.tsx` and comprehensive `PRIVACY_POLICY.md` for Google Play notification policy compliance.
+
 ### v3.0.7
 - **Security Hardening (Permissions)**: Fixed `hasPermission()` false-positive vulnerability by replacing raw substring checking with exact `ComponentName` package verification.
 - **Security Hardening (Path Traversal)**: Sanitized package names and enforced strict canonical path validation within `ArtworkHelper` to eliminate arbitrary file write / path traversal risks.
@@ -360,6 +372,28 @@ export interface MediaEvent {
 ### v3.0.6
 - **Published to npm**: Officially available on npm as `expo-android-media-session-listener`.
 - **Expo SDK 58**: Fully compatible with Expo SDK 58, React Native `0.88.0`, React `19.3.0`, and `expo-modules-core` `~58.0.26`.
+
+### v3.0.5
+- **Updated**: Upgraded module dependencies to latest Expo SDK 58 (`~58.0.14`), React Native `0.88.0`, React `19.3.0`, and `expo-modules-core` `~58.0.22`.
+- **Renamed**: Renamed module to `expo-android-media-session-listener`.
+- **Packaging**: Updated build and packing script `pack.js` to build `expo-android-media-session-listener-3.0.5.tgz` with clean distribution files.
+
+### v3.0.4
+- **Updated**: Upgraded Expo to latest SDK 57 (`^57.0.28`).
+- **Updated**: Upgraded React Native to `0.86.3`.
+- **Updated**: Updated all Expo packages (`expo-font`, `expo-status-bar`, `expo-splash-screen`) and libraries to latest compatible versions.
+- **Updated**: Migrated splash screen configuration to the `expo-splash-screen` config plugin format.
+- **Updated**: Compiled clean native Android release APK build version 3.0.4.
+
+### v3.0.3
+- Minor internal codebase improvement.
+
+### v3.0.2
+- Minor internal codebase improvement.
+
+### v3.0.1 (Patch 1)
+- **Fixed**: Album artwork flashing on every event.
+- **Added**: Smart artwork caching using Title+Album signature.
 
 ---
 

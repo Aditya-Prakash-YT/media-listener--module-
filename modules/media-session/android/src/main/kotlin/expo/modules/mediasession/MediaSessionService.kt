@@ -16,6 +16,7 @@ class MediaSessionService : NotificationListenerService() {
     private var sessionManager: MediaSessionManager? = null
     private val controllerCallbacks = mutableMapOf<MediaController, MediaController.Callback>()
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
 
     companion object {
         private const val TAG = "MediaSessionService"
@@ -124,22 +125,44 @@ class MediaSessionService : NotificationListenerService() {
             else -> "unknown"
         }
 
-        // Use shared helper — no more duplicated artwork logic
-        val artworkUri = ArtworkHelper.resolveArtworkUri(controller, cacheDir)
+        val pkg = controller.packageName ?: ""
+        val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
+        val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST)
+            ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST) ?: ""
+        val album = metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: ""
+        val position = state?.position ?: 0L
+        val duration = metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
 
-        val bundle = Bundle().apply {
-            putString("package", controller.packageName)
-            putString("title", metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "")
-            putString("artist", metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST)
-                ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST) ?: "")
-            putString("album", metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: "")
-            putString("state", stateString)
-            putString("artworkUri", artworkUri)
-            putLong("position", state?.position ?: 0L)
-            putLong("duration", metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L)
-            putLong("timestamp", System.currentTimeMillis())
+        backgroundExecutor.execute {
+            try {
+                // Disk I/O and JPEG compression safely performed in background
+                val artworkUri = ArtworkHelper.resolveArtworkUri(controller, cacheDir)
+
+                val bundle = Bundle().apply {
+                    putString("package", pkg)
+                    putString("title", title)
+                    putString("artist", artist)
+                    putString("album", album)
+                    putString("state", stateString)
+                    putString("artworkUri", artworkUri)
+                    putLong("position", position)
+                    putLong("duration", duration)
+                    putLong("timestamp", System.currentTimeMillis())
+                }
+
+                MediaEventManager.emitEvent(bundle)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error resolving artwork or emitting state in background", e)
+            }
         }
+    }
 
-        MediaEventManager.emitEvent(bundle)
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            backgroundExecutor.shutdown()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error shutting down backgroundExecutor", e)
+        }
     }
 }

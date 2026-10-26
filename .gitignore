@@ -9,7 +9,7 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# Native & Android
 .kotlin/
 *.orig.*
 *.jks
@@ -17,6 +17,20 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+*.keystore
+!debug.keystore
+local.properties
+android/local.properties
+.gradle/
+**/.gradle/
+**/build/
+android/app/build/
+
+# Android Build Outputs & Packages
+*.apk
+*.aab
+*.tgz
+*.tar.gz
 
 # Metro
 .metro-health-check*
