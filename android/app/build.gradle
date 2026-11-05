@@ -92,8 +92,8 @@ android {
         applicationId 'com.mediasessionapp'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "3.0.8"
+        versionCode 4
+        versionName "3.0.9"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -111,7 +111,8 @@ android {
                 keyAlias RELEASE_KEY_ALIAS
                 keyPassword RELEASE_KEY_PASSWORD
             } else {
-                // Fallback to debug keystore only if no release keystore is provided
+                // SEC-04: Loud warning — debug keystore is NOT suitable for production distribution
+                println "WARNING: RELEASE_STORE_FILE not set. Release build will use debug keystore — NOT suitable for production distribution."
                 storeFile file('debug.keystore')
                 storePassword 'android'
                 keyAlias 'androiddebugkey'

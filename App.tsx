@@ -710,7 +710,7 @@ export default function App() {
       <View style={styles.header}>
         <View>
           <Text style={styles.appTitle}>MEDIA LISTENER</Text>
-          <Text style={styles.appSubtitle}>V3.0.8 NATIVE MODULE</Text>
+          <Text style={styles.appSubtitle}>V3.0.9 NATIVE MODULE</Text>
         </View>
 
         {/* Minimalist Action Controls */}

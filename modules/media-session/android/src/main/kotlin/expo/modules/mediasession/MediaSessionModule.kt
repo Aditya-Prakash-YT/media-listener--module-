@@ -83,11 +83,24 @@ class MediaSessionModule : Module() {
         }
 
         Function("getState") {
-            val controller = MediaSessionService.activeController
-            if (controller == null) return@Function null
+            val controller = MediaSessionService.activeController ?: return@Function null
             
-            val metadata = controller.metadata
-            val state = controller.playbackState
+            val pkg: String
+            val metadata: android.media.MediaMetadata?
+            val state: PlaybackState?
+
+            try {
+                pkg = controller.packageName ?: ""
+                metadata = controller.metadata
+                state = controller.playbackState
+            } catch (e: android.os.DeadObjectException) {
+                Log.w(TAG, "MediaController is dead during getState, clearing reference")
+                MediaSessionService.clearActiveControllerIf(controller)
+                return@Function null
+            } catch (e: Exception) {
+                Log.w(TAG, "Error querying controller in getState", e)
+                return@Function null
+            }
             
             val stateString = when (state?.state) {
                 PlaybackState.STATE_PLAYING -> "playing"
@@ -97,25 +110,34 @@ class MediaSessionModule : Module() {
                 else -> "unknown"
             }
 
-            // Use shared helper — single source of truth for artwork resolution
+            val rawTitle = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)
+            val rawArtist = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST)
+                ?: metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
+            val rawAlbum = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM)
+
+            val title = (rawTitle ?: "").take(1000)
+            val artist = (rawArtist ?: "").take(1000)
+            val album = (rawAlbum ?: "").take(1000)
+            val position = (state?.position ?: 0L).coerceAtLeast(0L)
+            val duration = (metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: 0L).coerceAtLeast(0L)
+
+            // Use shared helper snapshot overload to avoid redundant Binder IPC calls
             val artworkUri = try {
-                ArtworkHelper.resolveArtworkUri(controller, context.cacheDir)
+                ArtworkHelper.resolveArtworkUri(pkg, metadata, context.cacheDir)
             } catch (e: Exception) {
                 Log.e(TAG, "Error resolving artwork in getState", e)
                 null
             }
-            
-            val artistStr = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST)
-                ?: metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST) ?: ""
 
             val result = mutableMapOf<String, Any?>(
-                "package" to controller.packageName,
-                "title" to (metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: ""),
-                "artist" to artistStr,
-                "album" to (metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM) ?: ""),
+                "package" to pkg,
+                "title" to title,
+                "artist" to artist,
+                "album" to album,
                 "state" to stateString,
-                "position" to (state?.position ?: 0L),
-                "duration" to (metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: 0L)
+                "position" to position,
+                "duration" to duration,
+                "timestamp" to System.currentTimeMillis()
             )
 
             if (artworkUri != null) {
@@ -127,7 +149,11 @@ class MediaSessionModule : Module() {
 
         OnStartObserving {
             MediaEventManager.setListener { bundle ->
-                sendEvent("onMediaChanged", bundleToMap(bundle))
+                try {
+                    sendEvent("onMediaChanged", bundleToMap(bundle))
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to send onMediaChanged event to JS runtime", e)
+                }
             }
         }
 
@@ -137,14 +163,15 @@ class MediaSessionModule : Module() {
     }
 
     private fun safeTransportAction(action: (android.media.session.MediaController.TransportControls) -> Unit) {
+        val controller = MediaSessionService.activeController ?: return
         try {
-            val controller = MediaSessionService.activeController
-            val controls = controller?.transportControls
+            val controls = controller.transportControls
             if (controls != null) {
                 action(controls)
             }
         } catch (e: android.os.DeadObjectException) {
-            Log.w(TAG, "MediaController is dead or process terminated", e)
+            Log.w(TAG, "MediaController is dead or process terminated, clearing reference", e)
+            MediaSessionService.clearActiveControllerIf(controller)
         } catch (e: SecurityException) {
             Log.w(TAG, "SecurityException calling transport control", e)
         } catch (e: Exception) {

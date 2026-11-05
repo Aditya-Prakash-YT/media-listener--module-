@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.9] - 2026-11-06
+
+### Security & Hardening
+- **Local File & Scheme Protection**: Blocked arbitrary `file://` schemes from external media metadata. Only verified `https://` and Android `content://` URIs are permitted.
+- **SSRF & Privacy Leak Prevention**: Dropped unencrypted `http://` scheme handling in compliance with zero-remote-transmission privacy policies and to eliminate network tracking beacons from unprivileged local apps.
+- **OutOfMemory & Crash Immunity**: Caught `OutOfMemoryError` (in addition to `Throwable`) and checked `rawBitmap.isRecycled` during album art downscaling and compression, preventing memory exhaustion attacks from oversized bitmaps.
+- **Filesystem & Filename Bounds**: Sanitized package name inputs and capped length at 128 characters to prevent Linux filesystem `ENAMETOOLONG` exceptions, and enforced owner-only file permissions (`setReadable(true, true)`).
+- **Production Log Sanitization**: Added ProGuard / R8 rules in `proguard-rules.pro` to automatically strip `Log.d` and `Log.v` statements in release builds to prevent metadata exposure via system logcat.
+- **Release Signing & Configuration Hygiene**: Added build warnings when release keystores are unconfigured, disabled development client network inspectors in production properties, and patched 10 supply-chain vulnerabilities via `npm audit fix`.
+
+### Concurrency, Stability & Bug Fixes
+- **Dead Object & Zombie Controller Immunity**: Handled `DeadObjectException` across all transport controls, `getState()`, and session callbacks, automatically pruning dead controllers so commands never hang or fail repeatedly.
+- **Thread Snapshot Consistency**: Captured track metadata as an immutable snapshot on the main thread and passed it to the background worker, eliminating artwork/metadata desynchronization race conditions.
+- **Self-Healing Background Worker**: Implemented a lifecycle-resilient `getExecutor()` factory that recreates daemon background worker threads if the Android OS disconnects and reconnects `NotificationListenerService`.
+- **Automatic Disk Cache Eviction**: Connected LRU cache eviction to physical file deletion on disk (`removeEldestEntry`) and added automatic startup cleanup of orphaned `.tmp` files.
+- **ContentProvider URI Integrity**: Preserved `content://` URIs cleanly without appending cache-busting parameters, ensuring compatibility with Android `ContentResolver` and local players (e.g., Samsung Music, system MediaStore).
+- **TypeScript Interface Parity**: Added the missing `timestamp` property to synchronous `getState()` returns, ensuring 100% compliance with the `MediaEvent` contract.
+
+---
+
 ## [3.0.8] - 2026-10-26
 
 ### Security & Hardening

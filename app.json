@@ -2,7 +2,7 @@
   "expo": {
     "name": "media-session-app",
     "slug": "media-session-app",
-    "version": "3.0.8",
+    "version": "3.0.9",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "com.mediasessionapp",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"

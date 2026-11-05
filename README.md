@@ -757,6 +757,14 @@ npm run build:module
 
 See the full history in [GitHub Releases](https://github.com/Aditya-Prakash-YT/media-listener--module-/releases).
 
+### v3.0.9
+- **Security Hardening**: Blocked arbitrary `file://` schemes, dropped cleartext `http://` handling, and enforced owner-only file permissions.
+- **Crash & OOM Immunity**: Explicitly caught `OutOfMemoryError` and checked `rawBitmap.isRecycled` in bitmap operations.
+- **Lifecycle & Concurrency**: Added snapshot-based metadata processing, self-healing background worker threads, and dead controller recovery (`DeadObjectException`).
+- **Disk & Cache Management**: Added on-disk LRU file eviction and automated orphaned `.tmp` file cleanup.
+- **ContentProvider Preservation**: Cleaned `content://` handling to prevent parameter corruption with local media players.
+- **API Parity**: Added `timestamp` to `getState()` for 100% compliance with `MediaEvent`.
+
 ### v3.0.8
 - **Security Audit & Path Traversal Fix**: Upgraded canonical path boundary validation in `ArtworkHelper` using trailing directory delimiter checks fully compatible with Android API 24+.
 - **Atomic File Writing**: Artwork is written to `.tmp` files and atomically renamed to prevent file corruption or race conditions.

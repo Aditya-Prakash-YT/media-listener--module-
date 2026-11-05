@@ -361,6 +361,19 @@ export interface MediaEvent {
 - **Release Signing Security**: Configured standalone `signingConfigs.release` supporting external keystore properties instead of hardcoded debug keys.
 - **Privacy & Compliance**: Added in-app prominent privacy disclosure in `App.tsx` and comprehensive `PRIVACY_POLICY.md` for Google Play notification policy compliance.
 
+### v3.0.9
+- **Security Hardening**: Blocked arbitrary `file://` schemes, dropped cleartext `http://` handling, and enforced owner-only file permissions.
+- **Crash & OOM Immunity**: Explicitly caught `OutOfMemoryError` and checked `rawBitmap.isRecycled` in bitmap operations.
+- **Lifecycle & Concurrency**: Added snapshot-based metadata processing, self-healing background worker threads, and dead controller recovery (`DeadObjectException`).
+- **Disk & Cache Management**: Added on-disk LRU file eviction and automated orphaned `.tmp` file cleanup.
+- **ContentProvider Preservation**: Cleaned `content://` handling to prevent parameter corruption with local media players.
+- **API Parity**: Added `timestamp` to `getState()` for 100% compliance with `MediaEvent`.
+
+### v3.0.8
+- **Security & Hardening**: Upgraded canonical boundary validation in `ArtworkHelper`, introduced atomic file writes via temporary files, removed unsafe manual bitmap recycling, and moved disk I/O off the main UI thread.
+- **Exception Safety**: Handled `DeadObjectException` and `SecurityException` across playback controls.
+- **Privacy & Compliance**: Added in-app prominent privacy disclosure and comprehensive `PRIVACY_POLICY.md`.
+
 ### v3.0.7
 - **Security Hardening (Permissions)**: Fixed `hasPermission()` false-positive vulnerability by replacing raw substring checking with exact `ComponentName` package verification.
 - **Security Hardening (Path Traversal)**: Sanitized package names and enforced strict canonical path validation within `ArtworkHelper` to eliminate arbitrary file write / path traversal risks.
